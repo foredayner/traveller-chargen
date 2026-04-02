@@ -61,8 +61,10 @@ export default function StepTerm() {
   // ── 직급 보너스 기능 자동 적용 ──────────────────────────────
   const applyRankBonus = (newRank) => {
     const rankTable = career?.ranks
-    const rankList  = rankTable?.[state.currentSpecialty]
-      ?? rankTable?.enlisted ?? rankTable?.all ?? []
+    // 장교면 officer 표, 사병이면 enlisted/specialty/all 표 사용
+    const rankList = state.currentIsOfficer
+      ? (rankTable?.officer ?? [])
+      : (rankTable?.[state.currentSpecialty] ?? rankTable?.enlisted ?? rankTable?.all ?? [])
     const rankBonus = rankList.find(r => r.rank === newRank)?.bonus
     if (!rankBonus || rankBonus === null) return
     const m = rankBonus.match(/^(.+)-(\d+)$/)
@@ -131,8 +133,11 @@ export default function StepTerm() {
           </div>
           {(() => {
             const gb = state.gradBenefits
-            const isFirstGradMilitary = state.preCareerSuccess && !gb.usedCommission
-              && ['army','navy','marine'].includes(state.currentCareer)
+            const isMilitaryCareer = ['army','navy','marine'].includes(state.currentCareer)
+            // 졸업 후 첫 군 경력인지: 이전 주기 중 군 경력이 없어야 함
+            const hasHadMilitary = state.careers.some(c => ['army','navy','marine'].includes(c.careerId))
+            const isFirstGradMilitary = gb.canCommission && !gb.usedCommission
+              && isMilitaryCareer && !hasHadMilitary
             const commDm = isFirstGradMilitary ? (gb.commissionDm === 99 ? 0 : gb.commissionDm) : 0
             const autoComm = isFirstGradMilitary && (gb.autoCommission || gb.commissionDm === 99)
             // 임관 DM: 첫 주기가 아니면 -1 (지위 8+인 경우)
@@ -158,6 +163,12 @@ export default function StepTerm() {
                           setResults(rv => ({ ...rv, commission: { total:'자동', success:true } }))
                           actions.rollCommission(true)
                           actions.markGradBenefitUsed('commission')
+                          // 임관 계급 1 기능 자동 부여
+                          const r1 = career?.ranks?.officer?.find(r => r.rank === 1)
+                          if (r1?.bonus) {
+                            const m = r1.bonus.match(/^(.+)-(\d+)$/)
+                            if (m) actions.applySkill(m[1].trim(), parseInt(m[2]))
+                          }
                           setSub(SUB.SURVIVAL)
                         }}>임관 확인 →</button>
                       </div>
@@ -172,6 +183,14 @@ export default function StepTerm() {
                           setResults(rv => ({ ...rv, commission: r }))
                           actions.rollCommission(success)
                           if (isFirstGradMilitary) actions.markGradBenefitUsed('commission')
+                          // 임관 성공 시 계급 1 기능 자동 부여
+                          if (success) {
+                            const r1 = career?.ranks?.officer?.find(r => r.rank === 1)
+                            if (r1?.bonus) {
+                              const m = r1.bonus.match(/^(.+)-(\d+)$/)
+                              if (m) actions.applySkill(m[1].trim(), parseInt(m[2]))
+                            }
+                          }
                         }}
                       />
                     )}
@@ -340,10 +359,11 @@ export default function StepTerm() {
                   if (hasAutoAdvance) {
                     const newRank = Math.min(6, (state.currentRank ?? 0) + 1)
                     actions.resolveAdvancement(true, newRank)
-                    // 직급 보너스
+                    // 직급/계급 보너스 (장교/사병 구분)
                     const rankTable = career?.ranks
-                    const rankList  = rankTable?.[state.currentSpecialty]
-                      ?? rankTable?.enlisted ?? rankTable?.all ?? []
+                    const rankList = state.currentIsOfficer
+                      ? (rankTable?.officer ?? [])
+                      : (rankTable?.[state.currentSpecialty] ?? rankTable?.enlisted ?? rankTable?.all ?? [])
                     const rankBonus = rankList.find(r => r.rank === newRank)?.bonus
                     if (rankBonus) {
                       const m = rankBonus.match(/^(.+)-(\d+)$/)
@@ -379,8 +399,17 @@ export default function StepTerm() {
               mod={statModifier(state.stats[specialty?.advancement?.stat ?? 'edu'] ?? 0)}
               target={specialty?.advancement?.target ?? 7}
               onResult={({ values, total, success }) => {
+                const rawRoll = values[0] + (values[1] ?? 0)
                 const newRank = success ? Math.min(6, Math.min(6, (state.currentRank ?? 0) + 1)) : state.currentRank ?? 0
-                const adv = { roll: values[0]+(values[1]??0), mod: statModifier(state.stats[specialty?.advancement?.stat??'edu']??0), total, success }
+                // 룰북: 진급 결괏값(수정 전) <= 현재 주기 수 → 경력 강제 종료
+                // 진급 결괏값(수정 전) 12 → 경력 강제 유지
+                const forcedEnd      = !success && rawRoll <= state.currentTerm
+                const forcedContinue = rawRoll === 12
+                const adv = {
+                  roll: rawRoll,
+                  mod: statModifier(state.stats[specialty?.advancement?.stat??'edu']??0),
+                  total, success, forcedEnd, forcedContinue
+                }
                 setResults(rv => ({ ...rv, advancement: adv, newRank }))
                 actions.resolveAdvancement(success, newRank)
                 if (success && newRank > 0) applyRankBonus(newRank)
@@ -391,9 +420,11 @@ export default function StepTerm() {
             <>
               <p style={{ fontSize:'0.82rem', color: results.advancement.success ? 'var(--col-green)' : 'var(--col-text-muted)', marginBottom:'0.75rem' }}>
                 {results.advancement.success ? (() => {
-                  const rankList = career?.ranks?.[state.currentSpecialty] ?? career?.ranks?.enlisted ?? career?.ranks?.all ?? []
+                  const rankList = state.currentIsOfficer
+                    ? (career?.ranks?.officer ?? [])
+                    : (career?.ranks?.[state.currentSpecialty] ?? career?.ranks?.enlisted ?? career?.ranks?.all ?? [])
                   const rankEntry = rankList.find(r => r.rank === results.newRank)
-                  return `진급! 직급 ${results.newRank}${rankEntry?.title && rankEntry.title !== '-' ? ` — ${rankEntry.title}` : ''}`
+                  return `진급! ${state.currentIsOfficer ? '계급' : '직급'} ${results.newRank}${rankEntry?.title && rankEntry.title !== '-' ? ` — ${rankEntry.title}` : ''}`
                 })() : '진급 없음'}
               </p>
               <button className="btn btn-primary" onClick={() => setSub(needAging ? SUB.AGING : SUB.END)}>다음 →</button>
@@ -443,7 +474,6 @@ export default function StepTerm() {
         </div>
       )}
 
-      {/* ── 주기 종료 ── */}
       {sub === SUB.END && (
         <div className="card">
           <div className="card-title">
@@ -453,16 +483,51 @@ export default function StepTerm() {
           <div style={{ fontSize:'0.82rem', color:'var(--col-text-muted)', marginBottom:'1rem' }}>
             {state.currentTerm}주기 완료. 나이: {state.age + 4}세가 됩니다.
           </div>
+
+          {/* 강제 유지: 진급 결괏값 12 */}
+          {results.advancement?.forcedContinue && (
+            <div style={{padding:'0.6rem 0.8rem',marginBottom:'0.75rem',background:'rgba(200,168,75,0.08)',border:'1px solid var(--col-gold-dim)',borderRadius:'var(--radius-md)',fontSize:'0.82rem',color:'var(--col-gold)'}}>
+              ✦ 진급 결괏값 12 — 너무 귀한 인재라 경력을 반드시 계속해야 합니다!
+            </div>
+          )}
+
+          {/* 강제 종료: 진급 결괏값 ≤ 현재 주기 수 */}
+          {results.advancement?.forcedEnd && (
+            <div style={{padding:'0.6rem 0.8rem',marginBottom:'0.75rem',background:'rgba(224,82,82,0.07)',border:'1px solid rgba(224,82,82,0.3)',borderRadius:'var(--radius-md)',fontSize:'0.82rem',color:'var(--col-red)'}}>
+              ⚠ 진급 결괏값({results.advancement.roll}) ≤ {state.currentTerm}주기 — 일거리가 없어져 이 경력을 계속할 수 없습니다.
+            </div>
+          )}
+
           <div className="choice-group">
-            <button className="btn btn-primary" onClick={actions.endTermContinue}>
-              같은 경력 계속 ({state.currentTerm + 1}주기)
-            </button>
-            <button className="btn" onClick={actions.endTermChange}>
-              다른 경력으로 전환
-            </button>
-            <button className="btn btn-ghost" onClick={actions.endTermRetire}>
-              은퇴 → 완성 단계
-            </button>
+            {/* 강제 유지: 같은 경력만 선택 가능 */}
+            {results.advancement?.forcedContinue ? (
+              <button className="btn btn-primary" onClick={actions.endTermContinue}>
+                경력 계속 (강제) — {state.currentTerm + 1}주기
+              </button>
+            ) : results.advancement?.forcedEnd ? (
+              /* 강제 종료: 다른 경력 또는 은퇴만 */
+              <>
+                <button className="btn btn-primary" onClick={actions.endTermChange}>
+                  다른 경력으로 전환
+                </button>
+                <button className="btn btn-ghost" onClick={actions.endTermRetire}>
+                  은퇴 → 완성 단계
+                </button>
+              </>
+            ) : (
+              /* 일반: 자유 선택 */
+              <>
+                <button className="btn btn-primary" onClick={actions.endTermContinue}>
+                  같은 경력 계속 ({state.currentTerm + 1}주기)
+                </button>
+                <button className="btn" onClick={actions.endTermChange}>
+                  다른 경력으로 전환
+                </button>
+                <button className="btn btn-ghost" onClick={actions.endTermRetire}>
+                  은퇴 → 완성 단계
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -90,7 +90,7 @@ export default function SideSheet() {
             <div key={i} style={{display:'flex',gap:'0.4rem',alignItems:'center',padding:'2px 0',borderBottom:'1px solid rgba(30,45,74,0.4)',fontSize:'0.72rem'}}>
               <span style={{color:'var(--col-text-dim)',fontFamily:'var(--font-mono)',minWidth:'16px'}}>{c.term}</span>
               <span style={{color:'var(--col-text)',flex:1}}>{c.careerId}</span>
-              {c.rank>0&&<span style={{color:'var(--col-gold)',fontFamily:'var(--font-mono)',fontSize:'0.65rem'}}>직급{c.rank}</span>}
+              {c.rank>0&&<span style={{color:'var(--col-gold)',fontFamily:'var(--font-mono)',fontSize:'0.65rem'}}>{c.isOfficer?'계급':'직급'}{c.rank}</span>}
               <span style={{color:c.survived!==false?'var(--col-green)':'var(--col-red)',fontSize:'0.6rem'}}>
                 {c.survived!==false?'✓':'✗'}
               </span>

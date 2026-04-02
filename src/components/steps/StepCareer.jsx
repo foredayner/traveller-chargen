@@ -238,7 +238,9 @@ export default function StepCareer() {
       {currentCareer && currentSpecialty && (() => {
         const gb = state.gradBenefits
         const isLinkedCareer = gb.autoQual === currentCareer
-        const qualDm = (!gb.usedQualDm && gb.qualDm > 0 && !isLinkedCareer) ? gb.qualDm : 0
+        // 자격 DM: 대학교 졸업 혜택 경력인지 + 아직 미사용
+        const isEligible = gb.qualEligible?.includes(currentCareer)
+        const qualDm = (!gb.usedQualDm && gb.qualDm > 0 && isEligible && !isLinkedCareer) ? gb.qualDm : 0
         const autoQualThisTerm = !gb.usedQualDm && isLinkedCareer && gb.autoQual
 
         return (

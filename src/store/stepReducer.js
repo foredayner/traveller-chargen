@@ -47,11 +47,13 @@ export const INITIAL_STATE = {
 
   // 졸업 혜택 플래그 (경력 선택에서 소비됨)
   gradBenefits: {
-    qualDm: 0,          // 자격 굴림 수정치 (+1 보통, +2 우등)
-    commissionDm: 0,    // 임관 굴림 수정치 (+2 사관학교, +2 우등대학)
-    autoCommission: false,  // 임관 자동 성공 (사관학교 우등)
-    autoQual: null,     // 자격 자동 성공 경력 id (사관학교 연계 경력)
-    usedQualDm: false,  // 자격 DM 이미 사용했는지
+    qualDm: 0,              // 자격 굴림 수정치 (+1 보통, +2 우등)
+    qualEligible: [],       // DM 적용 가능한 경력 id 목록
+    commissionDm: 0,        // 임관 굴림 수정치
+    autoCommission: false,  // 임관 자동 성공
+    canCommission: false,   // 대학교 졸업 후 임관 시도 가능 여부
+    autoQual: null,         // 자격 자동 성공 경력 id (사관학교 연계)
+    usedQualDm: false,      // 자격 DM 이미 사용했는지
     usedCommission: false,  // 임관 혜택 이미 사용했는지
   },
 
@@ -276,21 +278,34 @@ export function characterReducer(state, action) {
         if (state.preCareer === 'university') {
           // 대학교 졸업: edu +1 추가 (입학 시 +1 이미 적용)
           stats.edu = Math.min(15, stats.edu + 1)
-          // 자격 DM: 보통 +1, 우등 +2
+          if (honors) stats.edu = Math.min(15, stats.edu + 1) // 우등: edu 추가 +1
+          // 자격 DM 적용 대상 경력 (룰북 p.14)
           gradBenefits.qualDm = honors ? 2 : 1
-          // 임관 굴림: 보통 가능(+0), 우등 +2
+          gradBenefits.qualEligible = [
+            'entertainer', // 미디어 직군(언론인)
+            'citizen',     // 시민(기업가)
+            'agent',       // 요원
+            'army',        // 육군
+            'scout',       // 정찰 직군
+            'scholar',     // 학자
+            'navy',        // 해군
+            'marine',      // 해병
+          ]
+          // 임관 굴림: 대학 졸업 후 첫 군 경력에서 가능
+          gradBenefits.canCommission = true
           gradBenefits.commissionDm = honors ? 2 : 0
           gradBenefits.autoCommission = false
           gradBenefits.autoQual = null
-          if (honors) stats.edu = Math.min(15, stats.edu + 1) // 우등: edu 추가 +1
         } else if (linkedCareer) {
           // 사관학교 졸업: edu +1
           stats.edu = Math.min(15, stats.edu + 1)
-          // 우등 졸업: 지위 +1 추가
           if (honors) stats.soc = Math.min(15, stats.soc + 1)
-          // 자격: 연계 군 경력 자동 성공
+          // 사관학교는 연계 경력 자격 자동 성공
           gradBenefits.autoQual = linkedCareer
+          gradBenefits.qualDm = 0
+          gradBenefits.qualEligible = []
           // 임관: 사관학교 +2, 우등 자동 성공
+          gradBenefits.canCommission = true
           gradBenefits.commissionDm = honors ? 99 : 2  // 99 = 자동성공
           gradBenefits.autoCommission = honors
         }
@@ -379,9 +394,14 @@ export function characterReducer(state, action) {
     }
 
     case A.ROLL_COMMISSION: {
+      if (!action.success) {
+        return { ...state, currentIsOfficer: false }
+      }
+      // 임관 성공: 장교 계급 1로 시작
       return {
         ...state,
-        currentIsOfficer: action.success,
+        currentIsOfficer: true,
+        currentRank: 1,  // 임관 = 계급 1 장교
       }
     }
 
