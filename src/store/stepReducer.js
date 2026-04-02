@@ -43,6 +43,17 @@ export const INITIAL_STATE = {
   // 경력 전 교육
   preCareer: null,        // null | 'university' | 'army_academy' | 'marine_academy' | 'navy_academy'
   preCareerSuccess: null, // null | true | false
+  preCareerHonors: false, // 우등 졸업 여부 (결괏값 10+)
+
+  // 졸업 혜택 플래그 (경력 선택에서 소비됨)
+  gradBenefits: {
+    qualDm: 0,          // 자격 굴림 수정치 (+1 보통, +2 우등)
+    commissionDm: 0,    // 임관 굴림 수정치 (+2 사관학교, +2 우등대학)
+    autoCommission: false,  // 임관 자동 성공 (사관학교 우등)
+    autoQual: null,     // 자격 자동 성공 경력 id (사관학교 연계 경력)
+    usedQualDm: false,  // 자격 DM 이미 사용했는지
+    usedCommission: false,  // 임관 혜택 이미 사용했는지
+  },
 
   // 경력 기록 (주기 배열)
   careers: [],
@@ -141,7 +152,7 @@ export const A = {
 
   // Step 5: 경력 주기
   RESOLVE_BASIC_TRAINING: 'RESOLVE_BASIC_TRAINING', // { skills }
-  ROLL_COMMISSION:     'ROLL_COMMISSION',    // { roll, success }
+  MARK_GRAD_BENEFIT_USED: 'MARK_GRAD_BENEFIT_USED',    // { roll, success }
   RESOLVE_SURVIVAL:    'RESOLVE_SURVIVAL',  // { roll, success }
   RESOLVE_EVENT:       'RESOLVE_EVENT',     // { roll, choice?, effects[] }
   RESOLVE_MISHAP:      'RESOLVE_MISHAP',    // { roll, effects[] }
@@ -244,20 +255,60 @@ export function characterReducer(state, action) {
     }
 
     case A.RESOLVE_PRE_CAREER: {
-      const { success, skills: newSkills = [] } = action
+      const { success, honors = false, skills: newSkills = [] } = action
       let skills = { ...state.skills }
       for (const { skill, level } of newSkills) {
         skills[skill] = Math.max(skills[skill] ?? -1, level)
       }
-      // 졸업 보너스 적용
       let stats = { ...state.stats }
-      if (success && state.preCareer === 'university') {
-        stats.edu = Math.min(15, stats.edu + 2)
-        stats.soc = Math.min(15, stats.soc + 1)
+
+      // 연계 군 경력 매핑
+      const academyCareerMap = {
+        army_academy:   'army',
+        marine_academy: 'marine',
+        navy_academy:   'navy',
       }
+      const linkedCareer = academyCareerMap[state.preCareer] ?? null
+
+      let gradBenefits = { ...state.gradBenefits }
+
+      if (success) {
+        if (state.preCareer === 'university') {
+          // 대학교 졸업: edu +1 추가 (입학 시 +1 이미 적용)
+          stats.edu = Math.min(15, stats.edu + 1)
+          // 자격 DM: 보통 +1, 우등 +2
+          gradBenefits.qualDm = honors ? 2 : 1
+          // 임관 굴림: 보통 가능(+0), 우등 +2
+          gradBenefits.commissionDm = honors ? 2 : 0
+          gradBenefits.autoCommission = false
+          gradBenefits.autoQual = null
+          if (honors) stats.edu = Math.min(15, stats.edu + 1) // 우등: edu 추가 +1
+        } else if (linkedCareer) {
+          // 사관학교 졸업: edu +1
+          stats.edu = Math.min(15, stats.edu + 1)
+          // 우등 졸업: 지위 +1 추가
+          if (honors) stats.soc = Math.min(15, stats.soc + 1)
+          // 자격: 연계 군 경력 자동 성공
+          gradBenefits.autoQual = linkedCareer
+          // 임관: 사관학교 +2, 우등 자동 성공
+          gradBenefits.commissionDm = honors ? 99 : 2  // 99 = 자동성공
+          gradBenefits.autoCommission = honors
+        }
+      } else {
+        // 졸업 실패: 사관학교는 결괏값 3+이면 자동 입대는 가능
+        // (gradBenefits 초기화 유지 — 혜택 없음)
+        if (linkedCareer) {
+          // 졸업 실패해도 autoQual은 부여 (2 이하가 아닌 경우 자동 입대)
+          // 단 임관 굴림은 불가
+          gradBenefits.autoQual = action.entryRoll >= 3 ? linkedCareer : null
+        }
+      }
+
       return {
         ...state,
         preCareerSuccess: success,
+        preCareerHonors: honors,
+        gradBenefits,
         skills,
         stats,
         step: STEPS.CAREER,
@@ -313,6 +364,18 @@ export function characterReducer(state, action) {
         if (!(skill in skills)) skills[skill] = 0
       }
       return { ...state, skills }
+    }
+
+    case A.MARK_GRAD_BENEFIT_USED: {
+      const field = action.field  // 'qualDm' | 'commission'
+      return {
+        ...state,
+        gradBenefits: {
+          ...state.gradBenefits,
+          usedQualDm:     field === 'qualDm'     ? true : state.gradBenefits.usedQualDm,
+          usedCommission: field === 'commission'  ? true : state.gradBenefits.usedCommission,
+        }
+      }
     }
 
     case A.ROLL_COMMISSION: {
@@ -413,23 +476,26 @@ export function characterReducer(state, action) {
     }
 
     case A.END_TERM_CHANGE: {
-      const next = recordCurrentTerm(state, { survived: true })
+      const alreadyRecorded = state.currentCareer === null
+      const next = alreadyRecorded ? state : recordCurrentTerm(state, { survived: true })
       return {
         ...next,
         currentTerm: 1,
         currentCareer: null,
         currentSpecialty: null,
         currentIsOfficer: false,
-        age: state.age + 4,
+        age: alreadyRecorded ? state.age : state.age + 4,
         step: STEPS.CAREER,
       }
     }
 
     case A.END_TERM_RETIRE: {
-      const next = recordCurrentTerm(state, { survived: true })
+      // 사고로 이미 기록된 경우(currentCareer=null)는 재기록 하지 않음
+      const alreadyRecorded = state.currentCareer === null
+      const next = alreadyRecorded ? state : recordCurrentTerm(state, { survived: true })
       return {
         ...next,
-        age: state.age + 4,
+        age: alreadyRecorded ? state.age : state.age + 4,
         step: STEPS.FINISH,
       }
     }

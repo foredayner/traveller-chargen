@@ -129,35 +129,68 @@ export default function StepTerm() {
             임관 굴림 — 지위 8+
             <span className="card-title-en">COMMISSION</span>
           </div>
-          <p className="text-muted" style={{ fontSize:'0.82rem', marginBottom:'1rem' }}>
-            첫 주기이거나 지위 8 이상이면 임관을 시도할 수 있습니다. 성공 시 장교로 임관됩니다.
-            현재 지위: <strong style={{ color:'var(--col-cyan)', fontFamily:'var(--font-mono)' }}>{state.stats.soc ?? 0}</strong>
-          </p>
-          {!results.commission ? (
-            <div style={{ display:'flex', flexDirection:'column', gap:'0.75rem' }}>
-              <DiceRollInline
-                label="임관 굴림 — 지위 8+"
-                count={2} mod={statModifier(state.stats.soc ?? 0)}
-                target={8}
-                onResult={({ values, total, success }) => {
-                  const r = { roll: values[0]+values[1], mod: statModifier(state.stats.soc??0), total, success }
-                  setResults(rv => ({ ...rv, commission: r }))
-                  actions.rollCommission(success)
-                }}
-              />
-              <button className="btn btn-ghost" style={{ alignSelf:'flex-start' }}
-                onClick={() => setSub(SUB.SURVIVAL)}>건너뛰기 (사병 유지)</button>
-            </div>
-          ) : (
-            <>
-              <p style={{ fontSize:'0.82rem', color: results.commission.success ? 'var(--col-green)' : 'var(--col-text-muted)', marginBottom:'0.75rem' }}>
-                {results.commission.success ? '임관 성공! 장교로 임관됩니다.' : '임관 실패. 사병으로 복무합니다.'}
-              </p>
-              <button className="btn btn-primary" onClick={() => setSub(SUB.SURVIVAL)}>
-                다음 — 생존 굴림 →
-              </button>
-            </>
-          )}
+          {(() => {
+            const gb = state.gradBenefits
+            const isFirstGradMilitary = state.preCareerSuccess && !gb.usedCommission
+              && ['army','navy','marine'].includes(state.currentCareer)
+            const commDm = isFirstGradMilitary ? (gb.commissionDm === 99 ? 0 : gb.commissionDm) : 0
+            const autoComm = isFirstGradMilitary && (gb.autoCommission || gb.commissionDm === 99)
+            // 임관 DM: 첫 주기가 아니면 -1 (지위 8+인 경우)
+            const notFirstDm = !isFirstTerm ? -1 : 0
+
+            return (
+              <>
+                <p className="text-muted" style={{ fontSize:'0.82rem', marginBottom:'1rem' }}>
+                  {isFirstTerm ? '첫 주기 임관 시도.' : '지위 8+ 임관 시도 (비첫주기 -1).'}
+                  {autoComm && <span style={{color:'var(--col-gold)'}}> 사관학교 우등 졸업: 자동 성공!</span>}
+                  {commDm > 0 && !autoComm && <span style={{color:'var(--col-gold)'}}> 졸업 혜택 DM +{commDm}</span>}
+                  {notFirstDm < 0 && <span style={{color:'var(--col-amber)'}}> 비첫주기 DM {notFirstDm}</span>}
+                  {' '}현재 지위: <strong style={{color:'var(--col-cyan)',fontFamily:'var(--font-mono)'}}>{state.stats.soc ?? 0}</strong>
+                </p>
+                {!results.commission ? (
+                  <div style={{ display:'flex', flexDirection:'column', gap:'0.75rem' }}>
+                    {autoComm ? (
+                      <div>
+                        <p style={{color:'var(--col-green)',fontSize:'0.82rem',marginBottom:'0.75rem'}}>
+                          사관학교 우등 졸업으로 임관 자동 성공!
+                        </p>
+                        <button className="btn btn-primary" onClick={() => {
+                          setResults(rv => ({ ...rv, commission: { total:'자동', success:true } }))
+                          actions.rollCommission(true)
+                          actions.markGradBenefitUsed('commission')
+                          setSub(SUB.SURVIVAL)
+                        }}>임관 확인 →</button>
+                      </div>
+                    ) : (
+                      <DiceRollInline
+                        label={`임관 굴림 — 지위 8+${commDm > 0 ? ` (졸업 DM +${commDm})` : ''}${notFirstDm < 0 ? ` (비첫주기 ${notFirstDm})` : ''}`}
+                        count={2}
+                        mod={statModifier(state.stats.soc ?? 0) + commDm + notFirstDm}
+                        target={8}
+                        onResult={({ values, total, success }) => {
+                          const r = { roll: values[0]+values[1], mod: statModifier(state.stats.soc??0)+commDm+notFirstDm, total, success }
+                          setResults(rv => ({ ...rv, commission: r }))
+                          actions.rollCommission(success)
+                          if (isFirstGradMilitary) actions.markGradBenefitUsed('commission')
+                        }}
+                      />
+                    )}
+                    <button className="btn btn-ghost" style={{ alignSelf:'flex-start' }}
+                      onClick={() => setSub(SUB.SURVIVAL)}>건너뛰기 (사병 유지)</button>
+                  </div>
+                ) : (
+                  <>
+                    <p style={{ fontSize:'0.82rem', color: results.commission.success ? 'var(--col-green)' : 'var(--col-text-muted)', marginBottom:'0.75rem' }}>
+                      {results.commission.success ? '임관 성공! 장교로 임관됩니다.' : '임관 실패. 사병으로 복무합니다.'}
+                    </p>
+                    <button className="btn btn-primary" onClick={() => setSub(SUB.SURVIVAL)}>
+                      다음 — 생존 굴림 →
+                    </button>
+                  </>
+                )}
+              </>
+            )
+          })()}
         </div>
       )}
 

@@ -28,6 +28,10 @@ export default function StepCareer() {
   const prevCareerCount = careers.length
   const career = careersData[currentCareer]
 
+  // 사고로 경력이 종료됐는지 감지
+  const lastTerm = careers.at(-1)
+  const cameFromMishap = lastTerm?.survived === false
+
   // 징병
   const handleDraft = () => {
     const roll = roll1D()
@@ -109,9 +113,14 @@ export default function StepCareer() {
       <div className="step-heading">
         <h2>경력 선택</h2>
         <p>
-          {prevCareerCount > 0
-            ? `현재 ${prevCareerCount}번의 주기를 수행했습니다. 새로운 경력에 도전하거나 은퇴할 수 있습니다.`
-            : '첫 번째 경력을 선택합니다. 자격 굴림에 성공해야 입대할 수 있습니다.'}
+          {cameFromMishap
+            ? <span style={{color:'var(--col-amber)'}}>
+                사고로 경력이 종료됐습니다. 이전 {prevCareerCount - 1}주기의 소득은 유지됩니다.
+                새 경력을 시작하거나 은퇴해 소득을 정산하세요.
+              </span>
+            : prevCareerCount > 0
+              ? `현재 ${prevCareerCount}번의 주기를 수행했습니다. 새로운 경력에 도전하거나 은퇴할 수 있습니다.`
+              : '첫 번째 경력을 선택합니다. 자격 굴림에 성공해야 입대할 수 있습니다.'}
         </p>
       </div>
 
@@ -226,26 +235,57 @@ export default function StepCareer() {
 
 
       {/* 자격 굴림 */}
-      {currentCareer && currentSpecialty && (
+      {currentCareer && currentSpecialty && (() => {
+        const gb = state.gradBenefits
+        const isLinkedCareer = gb.autoQual === currentCareer
+        const qualDm = (!gb.usedQualDm && gb.qualDm > 0 && !isLinkedCareer) ? gb.qualDm : 0
+        const autoQualThisTerm = !gb.usedQualDm && isLinkedCareer && gb.autoQual
+
+        return (
         <div className="card mt-md">
-          <div className="card-title">자격 굴림</div>
+          <div className="card-title">
+            자격 굴림
+            {qualDm > 0 && <span style={{marginLeft:'0.5rem',color:'var(--col-gold)',fontSize:'0.72rem',fontFamily:'var(--font-mono)'}}>졸업 혜택 DM +{qualDm}</span>}
+            {autoQualThisTerm && <span style={{marginLeft:'0.5rem',color:'var(--col-green)',fontSize:'0.72rem',fontFamily:'var(--font-mono)'}}>✓ 졸업 혜택: 자격 자동 성공</span>}
+          </div>
           {!qualResult ? (
-            career.qualification.stat ? (
+            autoQualThisTerm ? (
+              // 사관학교 연계 경력: 자격 자동 성공
+              <div>
+                <p style={{fontSize:'0.82rem',color:'var(--col-green)',marginBottom:'0.75rem'}}>
+                  사관학교 졸업 혜택으로 {careersData[currentCareer]?.name} 경력 자격이 자동으로 성공합니다.
+                </p>
+                <button className="btn btn-primary" onClick={() => {
+                  setQualResult({ total: '자동', success: true })
+                  actions.resolveQualRoll(true)
+                  // usedQualDm 플래그 — 별도 action 또는 여기서 처리
+                }}>
+                  자동 입대 →
+                </button>
+              </div>
+            ) : career.qualification.stat ? (
               <DiceRollInline
-                label={`자격 굴림 — ${career.qualification.stat.toUpperCase()} ${career.qualification.target}+${prevCareerCount > 0 ? ` (DM ${-prevCareerCount})` : ''}`}
+                label={`자격 굴림 — ${career.qualification.stat.toUpperCase()} ${career.qualification.target}+${
+                  prevCareerCount > 0 ? ` (경력 DM ${-prevCareerCount})` : ''}${
+                  qualDm > 0 ? ` (졸업 DM +${qualDm})` : ''}`}
                 count={2}
-                mod={statModifier(state.stats[career.qualification.stat === 'dex_or_int'
-                  ? (state.stats.dex >= state.stats.int ? 'dex' : 'int')
-                  : career.qualification.stat] ?? 0) - prevCareerCount}
+                mod={statModifier(state.stats[
+                  career.qualification.stat === 'dex_or_int'
+                    ? (state.stats.dex >= state.stats.int ? 'dex' : 'int')
+                    : career.qualification.stat
+                ] ?? 0) - prevCareerCount + qualDm}
                 target={career.qualification.target}
                 onResult={({ values, total, success }) => {
                   setQualResult({ total, success })
                   actions.resolveQualRoll(success)
+                  if (qualDm > 0) actions.markGradBenefitUsed('qualDm')
                 }}
               />
             ) : (
-              // 자동 성공 (방랑자)
-              <button className="btn btn-primary" onClick={() => { setQualResult({ total: null, success: true }); actions.resolveQualRoll(true) }}>
+              <button className="btn btn-primary" onClick={() => {
+                setQualResult({ total: null, success: true })
+                actions.resolveQualRoll(true)
+              }}>
                 자동 성공 — 시작
               </button>
             )
@@ -267,15 +307,26 @@ export default function StepCareer() {
             </>
           )}
         </div>
-      )}
+        )
+      })()}
 
-      {/* 은퇴 옵션 (2주기 이상) */}
-      {prevCareerCount >= 2 && (
-        <div className="flex justify-between items-center mt-lg">
+      {/* 은퇴 옵션 (1주기 이상) */}
+      {prevCareerCount >= 1 && (
+        <div className="flex justify-between items-center mt-lg" style={{
+          padding: cameFromMishap ? '0.75rem 1rem' : '0',
+          background: cameFromMishap ? 'rgba(200,168,75,0.06)' : 'transparent',
+          border: cameFromMishap ? '1px solid var(--col-gold-dim)' : 'none',
+          borderRadius: cameFromMishap ? 'var(--radius-md)' : '0',
+        }}>
           <span className="text-muted" style={{ fontSize: '0.78rem' }}>
-            충분한 경력을 쌓았다면 은퇴하고 퇴직 소득을 정산합니다.
+            {cameFromMishap
+              ? `이전 ${prevCareerCount - 1}주기 소득이 유지됩니다. 은퇴하면 소득 정산 단계로 이동합니다.`
+              : '충분한 경력을 쌓았다면 은퇴하고 퇴직 소득을 정산합니다.'}
           </span>
-          <button className="btn btn-ghost" onClick={actions.endTermRetire}>
+          <button
+            className={cameFromMishap ? 'btn btn-primary' : 'btn btn-ghost'}
+            onClick={actions.endTermRetire}
+          >
             은퇴 — 완성 단계로
           </button>
         </div>

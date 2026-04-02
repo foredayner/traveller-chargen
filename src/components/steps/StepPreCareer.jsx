@@ -104,13 +104,9 @@ export default function StepPreCareer() {
 
   // 졸업 완료
   const handleConfirm = () => {
+    const honors = (gradResult?.total ?? 0) >= 10
     const skillsGained = []
-    if (gradResult?.success && option?.id === 'university') {
-      actions.applyStatChange('edu', 1)  // 졸업 보너스 edu+1 (입학 시 +1 이미 적용, 총 +2)
-      actions.applyStatChange('soc', 1)
-    }
-    actions.selectPreCareer(selected)
-    actions.resolvePreCareer(gradResult?.success ?? false, skillsGained)
+    actions.resolvePreCareer(gradResult?.success ?? false, skillsGained, honors, entryResult?.total ?? 12)
   }
 
   if (!canEnroll) {
@@ -295,7 +291,30 @@ export default function StepPreCareer() {
                   <div className={`roll-result ${gradResult.success ? 'success' : 'failure'}`} style={{marginBottom:'0.75rem'}}>
                     <div className={`roll-total ${gradResult.success ? 'success' : 'failure'}`}>{gradResult.total}</div>
                     <div className="roll-detail">
-                      {gradResult.success ? `졸업 성공! 소득: ${option.bonus}` : '졸업 실패 (기능은 유지)'}
+                      {gradResult.success
+                        ? gradResult.total >= 10
+                          ? `✦ 우등 졸업! 소득: ${option.bonus} + 추가 혜택`
+                          : `졸업 성공! 소득: ${option.bonus}`
+                        : '졸업 실패 (기능은 유지)'}
+                      {gradResult.success && option.id === 'university' && (
+                        <div style={{marginTop:'0.4rem',fontSize:'0.78rem',color:'var(--col-cyan)'}}>
+                          {gradResult.total >= 10
+                            ? '자격 굴림 +2, 임관 굴림 +2, 교육 추가 +1'
+                            : '자격 굴림 +1, 임관 굴림 가능'}
+                        </div>
+                      )}
+                      {gradResult.success && option.id !== 'university' && (
+                        <div style={{marginTop:'0.4rem',fontSize:'0.78rem',color:'var(--col-cyan)'}}>
+                          {gradResult.total >= 10
+                            ? '연계 경력 자격 자동 성공, 임관 자동 성공, 지위 +1'
+                            : '연계 경력 자격 자동 성공, 임관 굴림 +2'}
+                        </div>
+                      )}
+                      {!gradResult.success && option.id !== 'university' && entryResult?.total >= 3 && (
+                        <div style={{marginTop:'0.4rem',fontSize:'0.78rem',color:'var(--col-amber)'}}>
+                          졸업은 실패했지만 연계 경력 자동 입대는 가능합니다.
+                        </div>
+                      )}
                     </div>
                   </div>
                   <button className="btn btn-primary" onClick={handleConfirm}>

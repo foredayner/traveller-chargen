@@ -101,8 +101,8 @@ export function useCharacter() {
     dispatch({ type: A.SELECT_PRE_CAREER, preCareer })
   }, [])
 
-  const resolvePreCareer = useCallback((success, skills = []) => {
-    dispatch({ type: A.RESOLVE_PRE_CAREER, success, skills })
+  const resolvePreCareer = useCallback((success, skills = [], honors = false, entryRoll = 12) => {
+    dispatch({ type: A.RESOLVE_PRE_CAREER, success, skills, honors, entryRoll })
   }, [])
 
   // Step 4: 경력 선택
@@ -129,6 +129,10 @@ export function useCharacter() {
   // Step 5: 경력 주기
   const resolveBasicTraining = useCallback((skills) => {
     dispatch({ type: A.RESOLVE_BASIC_TRAINING, skills })
+  }, [])
+
+  const markGradBenefitUsed = useCallback((field) => {
+    dispatch({ type: A.MARK_GRAD_BENEFIT_USED, field })
   }, [])
 
   const rollCommission = useCallback((success) => {
@@ -283,6 +287,7 @@ export function useCharacter() {
       // Step 5
       resolveBasicTraining,
       rollCommission,
+      markGradBenefitUsed,
       resolveSurvival,
       resolveEvent,
       resolveMishap,
