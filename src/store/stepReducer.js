@@ -70,6 +70,7 @@ export const INITIAL_STATE = {
   currentSpecialty: null, // specialtyId
   currentTerm: 1,         // 현재 주기 번호
   currentIsOfficer: false,
+  currentRank: 0,         // 현재 주기에서 달성한 직급
 
   // 플래그
   isDrafted: false,       // 징병 여부
@@ -358,13 +359,8 @@ export function characterReducer(state, action) {
     case A.RESOLVE_ADVANCEMENT: {
       const { success, newRank } = action
       if (!success) return state
-      // 직급 상승 + 직급 보너스 기능 반영은 컴포넌트에서 계산 후 APPLY_SKILL로
-      const careers = [...state.careers]
-      if (careers.length > 0) {
-        const last = { ...careers[careers.length - 1], rank: newRank }
-        careers[careers.length - 1] = last
-      }
-      return { ...state, careers }
+      // currentRank에 진급 결과 저장 (END_TERM에서 careers에 기록됨)
+      return { ...state, currentRank: newRank }
     }
 
     case A.RESOLVE_AGING: {
@@ -494,10 +490,10 @@ function recordCurrentTerm(state, extra = {}) {
     specialtyId: state.currentSpecialty,
     term:        state.currentTerm,
     isOfficer:   state.currentIsOfficer,
-    rank:        0,  // advancement resolve 시 업데이트됨
+    rank:        state.currentRank ?? 0,  // 이번 주기에서 달성한 직급
     ...extra,
   }
-  return { ...state, careers: [...state.careers, termRecord] }
+  return { ...state, careers: [...state.careers, termRecord], currentRank: 0 }
 }
 
 /**
@@ -657,6 +653,9 @@ export const selectors = {
   musterRolls(state) {
     let total = 0
     for (const term of state.careers) {
+      // 사고(survived=false)로 끝난 주기는 소득 굴림 없음
+      // (명예 제대는 survived=true로 기록, 불명예는 false)
+      if (term.survived === false) continue
       total += 1 // 주기당 1회 기본
       const r = term.rank ?? 0
       if (r >= 5) total += 3

@@ -42,6 +42,10 @@ export default function StepTerm() {
   const isFirstTerm = state.careers.filter(c => c.careerId === state.currentCareer).length === 0
   const needAging   = state.age >= 34
   const hasCommission = ['army', 'navy', 'marine'].includes(state.currentCareer)
+  // 임관 조건: 군 경력 + (첫 주기 OR 지위 8+) + 아직 장교 아님
+  const canAttemptCommission = hasCommission
+    && !state.currentIsOfficer
+    && (isFirstTerm || (state.stats.soc ?? 0) >= 8)
 
   // events.json 비동기 로드
   useEffect(() => {
@@ -51,14 +55,8 @@ export default function StepTerm() {
   // ── 기초 훈련 ────────────────────────────────────────────────
   const handleBasicTraining = (skillsGained) => {
     actions.resolveBasicTraining(skillsGained)
-    setSub(hasCommission ? SUB.COMMISSION : SUB.SURVIVAL)
+    setSub(canAttemptCommission ? SUB.COMMISSION : SUB.SURVIVAL)
   }
-
-  // ── 현재 주기 최고 직급 계산 (진급 굴림에서 사용) ──────────────
-  const getCurrentRank = () =>
-    state.careers
-      .filter(c => c.careerId === state.currentCareer)
-      .reduce((max, c) => Math.max(max, c.rank ?? 0), 0)
 
   // ── 직급 보너스 기능 자동 적용 ──────────────────────────────
   const applyRankBonus = (newRank) => {
@@ -247,8 +245,14 @@ export default function StepTerm() {
                 key={`mishap-${results.mishap.roll}`}
                 eventData={results.mishap.data}
                 isMishap={true}
-                onResolved={() => {
-                  actions.resolveMishap([], true)
+                onResolved={(log) => {
+                  // 불명예 제대: 소득 없이 경력 종료
+                  const isDishonorable = log?.some(l => l.tag === '제대' && l.kind === 'loss')
+                  // 명예 제대: 소득 유지하며 경력 종료
+                  const isHonorable = log?.some(l => l.tag === '제대' && l.kind === 'neutral')
+                  // 경력 종료 여부
+                  const endCareer = !log?.some(l => l.tag === '사고' && l.text?.includes('경력 유지'))
+                  actions.resolveMishap([], endCareer)
                   setSub(SUB.END)
                 }}
               />
@@ -301,10 +305,7 @@ export default function StepTerm() {
                   // auto_advance 감지 → 진급 처리 후 다음 단계
                   const hasAutoAdvance = log?.some(l => l.tag === '진급')
                   if (hasAutoAdvance) {
-                    const currentRank = state.careers
-                      .filter(c => c.careerId === state.currentCareer)
-                      .reduce((max, c) => Math.max(max, c.rank ?? 0), 0)
-                    const newRank = Math.min(6, currentRank + 1)
+                    const newRank = Math.min(6, (state.currentRank ?? 0) + 1)
                     actions.resolveAdvancement(true, newRank)
                     // 직급 보너스
                     const rankTable = career?.ranks
@@ -345,7 +346,7 @@ export default function StepTerm() {
               mod={statModifier(state.stats[specialty?.advancement?.stat ?? 'edu'] ?? 0)}
               target={specialty?.advancement?.target ?? 7}
               onResult={({ values, total, success }) => {
-                const newRank = success ? Math.min(6, getCurrentRank() + 1) : getCurrentRank()
+                const newRank = success ? Math.min(6, Math.min(6, (state.currentRank ?? 0) + 1)) : state.currentRank ?? 0
                 const adv = { roll: values[0]+(values[1]??0), mod: statModifier(state.stats[specialty?.advancement?.stat??'edu']??0), total, success }
                 setResults(rv => ({ ...rv, advancement: adv, newRank }))
                 actions.resolveAdvancement(success, newRank)
@@ -356,7 +357,11 @@ export default function StepTerm() {
           ) : (
             <>
               <p style={{ fontSize:'0.82rem', color: results.advancement.success ? 'var(--col-green)' : 'var(--col-text-muted)', marginBottom:'0.75rem' }}>
-                {results.advancement.success ? `진급! 직급 → ${results.newRank}` : '진급 없음'}
+                {results.advancement.success ? (() => {
+                  const rankList = career?.ranks?.[state.currentSpecialty] ?? career?.ranks?.enlisted ?? career?.ranks?.all ?? []
+                  const rankEntry = rankList.find(r => r.rank === results.newRank)
+                  return `진급! 직급 ${results.newRank}${rankEntry?.title && rankEntry.title !== '-' ? ` — ${rankEntry.title}` : ''}`
+                })() : '진급 없음'}
               </p>
               <button className="btn btn-primary" onClick={() => setSub(needAging ? SUB.AGING : SUB.END)}>다음 →</button>
             </>

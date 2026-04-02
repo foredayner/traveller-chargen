@@ -276,18 +276,29 @@ function CharacterSheetPanel({ state, actions, derived }) {
       <div style={{display:'flex',gap:'0.75rem',justifyContent:'flex-end',flexWrap:'wrap'}}>
         <button className="btn btn-ghost" onClick={actions.exportJSON}>JSON 저장</button>
         <button className="btn btn-ghost" onClick={()=>window.print()}>인쇄 / PDF</button>
-        <button className="btn btn-primary" onClick={actions.finalize} disabled={!name} style={{minWidth:'120px'}}>
+        <button className="btn btn-primary"
+          onClick={()=>{ actions.finalize(); setTimeout(()=>window.scrollTo({top:0,behavior:'smooth'}),100) }}
+          disabled={!name} style={{minWidth:'120px'}}>
           {name?'✓ 완성!':'이름을 입력해주세요'}
         </button>
       </div>
 
       {state.isComplete && (
-        <div style={{marginTop:'1.5rem',padding:'1.25rem',textAlign:'center',border:'1px solid var(--col-gold)',borderRadius:'var(--radius-lg)',background:'rgba(200,168,75,0.06)'}}>
-          <div style={{fontFamily:'var(--font-display)',fontSize:'1.2rem',color:'var(--col-gold)',marginBottom:'0.5rem',letterSpacing:'0.1em'}}>
-            별들 사이로 — 모험을 찾아 떠납니다!
+        <div style={{marginTop:'1.5rem',padding:'1.5rem',textAlign:'center',border:'2px solid var(--col-gold)',borderRadius:'var(--radius-lg)',background:'rgba(200,168,75,0.08)',boxShadow:'0 0 32px rgba(200,168,75,0.15)',animation:'panelFadeIn 0.4s ease'}}>
+          <div style={{fontFamily:'var(--font-display)',fontSize:'1.4rem',color:'var(--col-gold)',marginBottom:'0.5rem',letterSpacing:'0.1em',textShadow:'0 0 20px rgba(200,168,75,0.5)'}}>
+            ✦ 별들 사이로 — 모험을 찾아 떠납니다! ✦
           </div>
-          <p style={{fontSize:'0.82rem',color:'var(--col-text-muted)',marginBottom:'1rem'}}>{name} 여행자의 캐릭터 생성이 완료됐습니다.</p>
-          <button className="btn btn-ghost" onClick={actions.resetCharacter}>↺ 새 여행자 만들기</button>
+          <p style={{fontSize:'0.88rem',color:'var(--col-text)',marginBottom:'0.4rem'}}>
+            <strong style={{color:'var(--col-gold)'}}>{name}</strong> 여행자의 캐릭터 생성이 완료됐습니다.
+          </p>
+          <p style={{fontSize:'0.78rem',color:'var(--col-text-muted)',marginBottom:'1.25rem'}}>
+            나이 {age}세 · 경력 {careers.length}주기 · 현금 Cr {(cash??0).toLocaleString()}
+          </p>
+          <div style={{display:'flex',gap:'0.75rem',justifyContent:'center',flexWrap:'wrap'}}>
+            <button className="btn btn-primary" onClick={actions.exportJSON}>💾 JSON 저장</button>
+            <button className="btn btn-ghost" onClick={()=>window.print()}>🖨 인쇄 / PDF</button>
+            <button className="btn btn-ghost" onClick={actions.resetCharacter}>↺ 새 여행자 만들기</button>
+          </div>
         </div>
       )}
     </div>

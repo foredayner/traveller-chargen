@@ -507,6 +507,12 @@ function AutoNarrativeEffect({ effect, state, actions, onDone }) {
     if (effect.type === 'alien_contact') {
       actions.addContact('contact', '외계 종족')
     }
+    // 불명예 제대: 이번 주기 소득 굴림 횟수를 0으로 (reducer에서 처리)
+    // → StepTerm onResolved에서 end_career=true로 처리되므로 여기선 플래그만
+    if (effect.type === 'dishonorable_discharge') {
+      // cashRollsUsed를 3으로 만들어 현금 추가 굴림 막기는 reducer에서 처리
+      // 여기서는 서사 텍스트만 표시
+    }
     onDone(entry)
   }
 
