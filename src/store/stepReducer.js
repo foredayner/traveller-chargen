@@ -435,6 +435,7 @@ export function characterReducer(state, action) {
         next.currentSpecialty = null
         next.currentTerm = 1
         next.currentIsOfficer = false
+        next.currentRank = 0   // 사고 종료 시 초기화
       }
       return next
     }
@@ -504,6 +505,7 @@ export function characterReducer(state, action) {
         currentCareer: null,
         currentSpecialty: null,
         currentIsOfficer: false,
+        currentRank: 0,   // 새 경력 시작 시 직급 초기화
         age: alreadyRecorded ? state.age : state.age + 4,
         step: STEPS.CAREER,
       }
@@ -576,10 +578,13 @@ function recordCurrentTerm(state, extra = {}) {
     specialtyId: state.currentSpecialty,
     term:        state.currentTerm,
     isOfficer:   state.currentIsOfficer,
-    rank:        state.currentRank ?? 0,  // 이번 주기에서 달성한 직급
+    rank:        state.currentRank ?? 0,
     ...extra,
   }
-  return { ...state, careers: [...state.careers, termRecord], currentRank: 0 }
+  // currentRank는 0으로 초기화하지 않고 유지
+  // → 다음 주기에서 이번 주기 달성 rank를 기반으로 +1 진급
+  // 단 다른 경력으로 전환(END_TERM_CHANGE)할 때는 0으로 초기화
+  return { ...state, careers: [...state.careers, termRecord] }
 }
 
 /**

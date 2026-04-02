@@ -55,20 +55,59 @@ export default function StepTerm() {
   // ── 기초 훈련 ────────────────────────────────────────────────
   const handleBasicTraining = (skillsGained) => {
     actions.resolveBasicTraining(skillsGained)
+    // 직급 0 보너스 기능 자동 부여 (예: 해병 직급0 → 사격 1)
+    applyRankBonus(0)
     setSub(canAttemptCommission ? SUB.COMMISSION : SUB.SURVIVAL)
   }
 
   // ── 직급 보너스 기능 자동 적용 ──────────────────────────────
   const applyRankBonus = (newRank) => {
     const rankTable = career?.ranks
-    // 장교면 officer 표, 사병이면 enlisted/specialty/all 표 사용
     const rankList = state.currentIsOfficer
       ? (rankTable?.officer ?? [])
       : (rankTable?.[state.currentSpecialty] ?? rankTable?.enlisted ?? rankTable?.all ?? [])
-    const rankBonus = rankList.find(r => r.rank === newRank)?.bonus
-    if (!rankBonus || rankBonus === null) return
-    const m = rankBonus.match(/^(.+)-(\d+)$/)
-    if (m) actions.applySkill(m[1].trim(), parseInt(m[2]))
+    const entry = rankList.find(r => r.rank === newRank)
+    if (!entry?.bonus || entry.bonus === null) return
+
+    const bonus = entry.bonus
+    const STATS = ['str','dex','end','int','edu','soc']
+
+    // 1. 특성치+N 형태: "end+1", "soc+1"
+    const statMatch = bonus.match(/^(str|dex|end|int|edu|soc)\+(\d+)$/i)
+    if (statMatch) {
+      actions.applyStatChange(statMatch[1].toLowerCase(), parseInt(statMatch[2]))
+      return
+    }
+
+    // 2. "soc-10 또는 soc+1 중 높은 쪽" — 현재 지위와 비교해 높은 값으로
+    if (bonus.includes('높은 쪽')) {
+      const setMatch = bonus.match(/soc-(\d+)/)
+      const plusMatch = bonus.match(/soc\+(\d+)/)
+      if (setMatch && plusMatch) {
+        const setVal  = parseInt(setMatch[1])
+        const plusVal = parseInt(plusMatch[1])
+        const curSoc  = state.stats.soc ?? 0
+        const newSoc  = Math.max(setVal, curSoc + plusVal)
+        actions.applyStatChange('soc', newSoc - curSoc)
+      }
+      return
+    }
+
+    // 3. "X 또는 Y" 선택형 — 첫 번째 옵션 자동 적용 (UI 선택은 향후 개선)
+    if (bonus.includes(' 또는 ')) {
+      const firstOption = bonus.split(' 또는 ')[0].trim()
+      const skillMatch = firstOption.match(/^(.+)-(\d+)$/)
+      if (skillMatch) {
+        actions.applySkill(skillMatch[1].trim(), parseInt(skillMatch[2]))
+      }
+      return
+    }
+
+    // 4. 일반 기능-레벨 형태: "지도력-1", "근접전(도검)-1"
+    const skillMatch = bonus.match(/^(.+)-(\d+)$/)
+    if (skillMatch) {
+      actions.applySkill(skillMatch[1].trim(), parseInt(skillMatch[2]))
+    }
   }
 
   // career 또는 specialty 없으면 경력 선택으로 안내
@@ -164,11 +203,7 @@ export default function StepTerm() {
                           actions.rollCommission(true)
                           actions.markGradBenefitUsed('commission')
                           // 임관 계급 1 기능 자동 부여
-                          const r1 = career?.ranks?.officer?.find(r => r.rank === 1)
-                          if (r1?.bonus) {
-                            const m = r1.bonus.match(/^(.+)-(\d+)$/)
-                            if (m) actions.applySkill(m[1].trim(), parseInt(m[2]))
-                          }
+                          applyRankBonus(1)
                           setSub(SUB.SURVIVAL)
                         }}>임관 확인 →</button>
                       </div>
@@ -184,13 +219,7 @@ export default function StepTerm() {
                           actions.rollCommission(success)
                           if (isFirstGradMilitary) actions.markGradBenefitUsed('commission')
                           // 임관 성공 시 계급 1 기능 자동 부여
-                          if (success) {
-                            const r1 = career?.ranks?.officer?.find(r => r.rank === 1)
-                            if (r1?.bonus) {
-                              const m = r1.bonus.match(/^(.+)-(\d+)$/)
-                              if (m) actions.applySkill(m[1].trim(), parseInt(m[2]))
-                            }
-                          }
+                          if (success) applyRankBonus(1)
                         }}
                       />
                     )}
@@ -359,16 +388,8 @@ export default function StepTerm() {
                   if (hasAutoAdvance) {
                     const newRank = Math.min(6, (state.currentRank ?? 0) + 1)
                     actions.resolveAdvancement(true, newRank)
-                    // 직급/계급 보너스 (장교/사병 구분)
-                    const rankTable = career?.ranks
-                    const rankList = state.currentIsOfficer
-                      ? (rankTable?.officer ?? [])
-                      : (rankTable?.[state.currentSpecialty] ?? rankTable?.enlisted ?? rankTable?.all ?? [])
-                    const rankBonus = rankList.find(r => r.rank === newRank)?.bonus
-                    if (rankBonus) {
-                      const m = rankBonus.match(/^(.+)-(\d+)$/)
-                      if (m) actions.applySkill(m[1].trim(), parseInt(m[2]))
-                    }
+                    // 직급/계급 보너스 — applyRankBonus로 통일 처리
+                    applyRankBonus(newRank)
                     setResults(rv => ({ ...rv, advancement: { success: true, total: '자동', roll: 0, mod: 0 }, newRank }))
                   }
                   setSub(needAging ? SUB.AGING : SUB.END)
