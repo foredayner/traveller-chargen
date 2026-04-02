@@ -1,0 +1,420 @@
+// ─────────────────────────────────────────────────────────────
+//  careersData.js
+//  careers.json의 한국어 특성치명을 코드 키로 변환하는 어댑터.
+//  컴포넌트는 이 파일만 임포트합니다.
+// ─────────────────────────────────────────────────────────────
+
+// 한국어 특성치 → 코드 키 매핑
+const STAT_MAP = {
+  '근력': 'str', '민첩': 'dex', '인내': 'end',
+  '지능': 'int', '교육': 'edu', '지위': 'soc',
+  'str': 'str', 'dex': 'dex', 'end': 'end',
+  'int': 'int', 'edu': 'edu', 'soc': 'soc',
+  'dex_or_int': 'dex_or_int',  // 미디어 직군 자격 굴림
+}
+
+function mapStat(s) {
+  return STAT_MAP[s] ?? s
+}
+
+// ─── 경력 데이터 (인라인) ────────────────────────────────────
+// careers.json의 내용을 JS로 직접 임포트합니다.
+// Vite 환경에서는 JSON 파일을 직접 import 가능하지만,
+// 특성치 키 변환이 필요하므로 어댑터를 거칩니다.
+
+const raw = {
+  noble: {
+    id: 'noble', name: '귀족',
+    description: '고정적으로 하는 일은 별로 없지만, 수중의 현금은 넉넉할 때가 많은 상류층 사람들입니다.',
+    qualification: { stat: 'soc', target: 10, auto_if_soc_10: true, dm_per_prev_career: -1 },
+    commission: null,
+    specialties: [
+      { id: 'administrator', name: '공직자',
+        survival: { stat: 'int', target: 4 }, advancement: { stat: 'edu', target: 6 } },
+      { id: 'diplomat', name: '외교관',
+        survival: { stat: 'int', target: 5 }, advancement: { stat: 'soc', target: 7 } },
+      { id: 'dilettante', name: '딜레탕트',
+        survival: { stat: 'soc', target: 3 }, advancement: { stat: 'int', target: 8 } },
+    ],
+    skillTables: {
+      personal:  ['str+1','dex+1','end+1','도박','사격','근접전'],
+      service:   ['행정','변호','전자기기','외교','수사','설득'],
+      advanced:  ['행정','변호','언어','지도력','외교','예술'],
+      specialist_administrator: ['행정','변호','중개','외교','지도력','설득'],
+      specialist_diplomat:      ['변호','유흥','전자기기','접객','외교','기만'],
+      specialist_dilettante:    ['유흥','기만','비행','세상물정','도박','다재다능'],
+    },
+    ranks: {
+      administrator: [
+        {rank:0,title:'서기보',bonus:null},{rank:1,title:'서기',bonus:'행정-1'},
+        {rank:2,title:'주사',bonus:null},{rank:3,title:'계장',bonus:'변호-1'},
+        {rank:4,title:'과장',bonus:null},{rank:5,title:'국장',bonus:'지도력-1'},
+        {rank:6,title:'장관',bonus:null},
+      ],
+      diplomat: [
+        {rank:0,title:'인턴',bonus:null},{rank:1,title:'3등 서기관',bonus:'행정-1'},
+        {rank:2,title:'2등 서기관',bonus:null},{rank:3,title:'1등 서기관',bonus:'변호-1'},
+        {rank:4,title:'참사관',bonus:null},{rank:5,title:'공사',bonus:'외교-1'},
+        {rank:6,title:'대사',bonus:null},
+      ],
+      dilettante: [
+        {rank:0,title:'한량',bonus:null},{rank:1,title:'-',bonus:null},
+        {rank:2,title:'무뢰한',bonus:'유흥-1'},{rank:3,title:'-',bonus:null},
+        {rank:4,title:'망나니',bonus:'설득-1'},{rank:5,title:'-',bonus:null},
+        {rank:6,title:'불한당',bonus:'다재다능-1'},
+      ],
+    },
+    mustering: {
+      cash:     [10000,10000,50000,50000,100000,100000,200000],
+      benefits: ['함선 지분','함선 지분×2','도검','soc+1','여행자 지원 협회 가입','요트','soc+1과 요트'],
+    },
+  },
+
+  rogue: {
+    id: 'rogue', name: '무법자',
+    description: '목표를 달성하기 위해 거칠거나 불법적인 방법도 거리낌 없이 사용하는 범죄자 부류입니다.',
+    qualification: { stat: 'dex', target: 6, dm_per_prev_career: -1 },
+    commission: null,
+    specialties: [
+      { id: 'thief',    name: '도둑',  survival: { stat:'int', target:6 }, advancement: { stat:'dex', target:6 } },
+      { id: 'enforcer', name: '폭력배', survival: { stat:'end', target:6 }, advancement: { stat:'str', target:6 } },
+      { id: 'pirate',   name: '해적',  survival: { stat:'dex', target:6 }, advancement: { stat:'int', target:6 } },
+    ],
+    skillTables: {
+      personal:  ['유흥','dex+1','end+1','도박','근접전','사격'],
+      service:   ['기만','경계','운동','사격','은신','세상물정'],
+      advanced:  ['전자기기','항법','의료','수사','중개','변호'],
+      specialist_thief:    ['은신','전자기기','경계','세상물정','기만','운동'],
+      specialist_enforcer: ['사격','근접전','세상물정','설득','운동','운전'],
+      specialist_pirate:   ['우주 비행','우주 항법','포격','기계공학','진공복','근접전'],
+    },
+    ranks: {
+      thief:    [{rank:0,title:'-',bonus:null},{rank:1,title:'-',bonus:'은신-1'},{rank:2,title:'-',bonus:null},{rank:3,title:'-',bonus:'세상물정-1'},{rank:4,title:'-',bonus:null},{rank:5,title:'-',bonus:'경계-1'},{rank:6,title:'-',bonus:null}],
+      enforcer: [{rank:0,title:'-',bonus:null},{rank:1,title:'-',bonus:'설득-1'},{rank:2,title:'-',bonus:null},{rank:3,title:'-',bonus:'사격-1 또는 근접전-1'},{rank:4,title:'-',bonus:null},{rank:5,title:'-',bonus:'세상물정-1'},{rank:6,title:'-',bonus:null}],
+      pirate:   [{rank:0,title:'말단',bonus:null},{rank:1,title:'부하',bonus:'우주 비행-1 또는 포격-1'},{rank:2,title:'상병',bonus:null},{rank:3,title:'하사',bonus:'사격-1 또는 근접전-1'},{rank:4,title:'부관',bonus:null},{rank:5,title:'지도자',bonus:'기계공학-1 또는 항법-1'},{rank:6,title:'선장',bonus:null}],
+    },
+    mustering: {
+      cash:     [0,0,10000,10000,50000,100000,100000],
+      benefits: ['함선 지분','무기','int+1','함선 지분×1D','장갑복','dex+1','함선 지분×1D'],
+    },
+  },
+
+  entertainer: {
+    id: 'entertainer', name: '미디어 직군',
+    description: '기자, 예술가, 연예인 등 미디어와 관련된 일을 하는 사람들입니다.',
+    qualification: { stat: 'dex_or_int', target: 5, dm_per_prev_career: -1 },
+    commission: null,
+    specialties: [
+      { id: 'artist',    name: '예술가', survival: { stat:'soc', target:6 }, advancement: { stat:'int', target:6 } },
+      { id: 'journalist',name: '언론인', survival: { stat:'edu', target:7 }, advancement: { stat:'int', target:5 } },
+      { id: 'performer', name: '공연자', survival: { stat:'int', target:5 }, advancement: { stat:'dex', target:7 } },
+    ],
+    skillTables: {
+      personal:  ['dex+1','int+1','soc+1','언어','유흥','다재다능'],
+      service:   ['예술','유흥','기만','운전','설득','접객'],
+      advanced:  ['변호','중개','기만','학문','세상물정','외교'],
+      specialist_artist:    ['예술','유흥','전자기기(컴퓨터)','도박','설득','산업'],
+      specialist_journalist:['예술(홀로그램 또는 글쓰기)','전자기기','운전','수사','경계','세상물정'],
+      specialist_performer: ['예술(공연 또는 악기)','운동','유흥','기만','은신','세상물정'],
+    },
+    ranks: {
+      artist:    [{rank:0,title:'-',bonus:null},{rank:1,title:'-',bonus:'예술-1'},{rank:2,title:'-',bonus:null},{rank:3,title:'-',bonus:'수사-1'},{rank:4,title:'-',bonus:null},{rank:5,title:'유명 예술가',bonus:'soc+1'},{rank:6,title:'-',bonus:null}],
+      journalist:[{rank:0,title:'-',bonus:null},{rank:1,title:'프리랜서 기자',bonus:'전자기기(통신)-1'},{rank:2,title:'정규 기자',bonus:'수사-1'},{rank:3,title:'-',bonus:null},{rank:4,title:'특파원',bonus:'설득-1'},{rank:5,title:'-',bonus:null},{rank:6,title:'수석 특파원',bonus:'soc+1'}],
+      performer: [{rank:0,title:'-',bonus:null},{rank:1,title:'-',bonus:'dex+1'},{rank:2,title:'-',bonus:null},{rank:3,title:'-',bonus:'str+1'},{rank:4,title:'-',bonus:null},{rank:5,title:'유명 공연자',bonus:'soc+1'},{rank:6,title:'-',bonus:null}],
+    },
+    mustering: {
+      cash:     [0,0,10000,10000,40000,40000,80000],
+      benefits: ['연줄','soc+1','연줄','soc+1','int+1','함선 지분×2','soc+1과 edu+1'],
+    },
+  },
+
+  drifter: {
+    id: 'drifter', name: '방랑자',
+    description: '명확한 목표나 목적지 없이 별들 사이를 떠돕니다.',
+    qualification: { stat: null, target: 0, auto: true },
+    commission: null,
+    specialties: [
+      { id: 'barbarian', name: '야만인',     survival: { stat:'end', target:7 }, advancement: { stat:'str', target:7 } },
+      { id: 'wanderer',  name: '떠돌이',     survival: { stat:'end', target:7 }, advancement: { stat:'int', target:7 } },
+      { id: 'scavenger', name: '자원 수집가', survival: { stat:'dex', target:7 }, advancement: { stat:'end', target:7 } },
+    ],
+    skillTables: {
+      personal:  ['str+1','end+1','dex+1','언어','산업','다재다능'],
+      service:   ['운동','근접전(비무장)','경계','세상물정','은신','생존'],
+      advanced:  null,
+      specialist_barbarian:  ['동물','유흥','근접전(도검)','은신','항해(개인선 또는 범선)','생존'],
+      specialist_wanderer:   ['운전','기만','경계','은신','세상물정','생존'],
+      specialist_scavenger:  ['우주 비행(소형선)','정비','우주 항법','진공복','산업','사격'],
+    },
+    ranks: {
+      barbarian: [{rank:0,title:'-',bonus:null},{rank:1,title:'-',bonus:'생존-1'},{rank:2,title:'전사',bonus:'근접전(도검)-1'},{rank:3,title:'-',bonus:null},{rank:4,title:'족장',bonus:'지도력-1'},{rank:5,title:'-',bonus:null},{rank:6,title:'대족장',bonus:null}],
+      wanderer:  [{rank:0,title:'-',bonus:null},{rank:1,title:'-',bonus:'세상물정-1'},{rank:2,title:'-',bonus:null},{rank:3,title:'-',bonus:'기만-1'},{rank:4,title:'-',bonus:null},{rank:5,title:'-',bonus:null},{rank:6,title:'-',bonus:null}],
+      scavenger: [{rank:0,title:'-',bonus:null},{rank:1,title:'-',bonus:'진공복-1'},{rank:2,title:'-',bonus:null},{rank:3,title:'-',bonus:'산업(소행성 채굴)-1 또는 정비-1'},{rank:4,title:'-',bonus:null},{rank:5,title:'-',bonus:null},{rank:6,title:'-',bonus:null}],
+    },
+    mustering: {
+      cash:     [0,0,1000,2000,3000,4000,8000],
+      benefits: ['연줄','무기','조력자','무기','edu+1','함선 지분','함선 지분×2'],
+    },
+  },
+
+  merchant: {
+    id: 'merchant', name: '상인',
+    description: '영리 기업의 일원입니다. 거대 무역회사 소속 함선의 승무원이거나 자유 무역선의 승무원입니다.',
+    qualification: { stat: 'int', target: 4, dm_per_prev_career: -1 },
+    commission: null,
+    specialties: [
+      { id: 'merchant_marine', name: '상선단',    survival: { stat:'edu', target:5 }, advancement: { stat:'int', target:7 } },
+      { id: 'free_trader',     name: '자유 무역상', survival: { stat:'dex', target:6 }, advancement: { stat:'int', target:6 } },
+      { id: 'broker',          name: '중개인',    survival: { stat:'edu', target:5 }, advancement: { stat:'int', target:7 } },
+    ],
+    skillTables: {
+      personal:  ['str+1','dex+1','end+1','int+1','언어','세상물정'],
+      service:   ['운전','진공복','중개','접객','전자기기','설득'],
+      advanced:  ['기계공학','우주 항법','전자기기','우주 비행','행정','변호'],
+      specialist_merchant_marine: ['우주 비행','진공복','운동','정비','기계공학','전자기기'],
+      specialist_free_trader:     ['우주 비행(우주선)','진공복','기만','정비','세상물정','포격'],
+      specialist_broker:          ['행정','변호','중개','세상물정','기만','설득'],
+    },
+    ranks: {
+      merchant_marine: [{rank:0,title:'선원',bonus:null},{rank:1,title:'상급 선원',bonus:'정비-1'},{rank:2,title:'4급 사관',bonus:null},{rank:3,title:'3급 사관',bonus:null},{rank:4,title:'2급 사관',bonus:'우주 비행-1'},{rank:5,title:'1급 사관',bonus:'soc+1'},{rank:6,title:'선장',bonus:null}],
+      free_trader:     [{rank:0,title:'-',bonus:null},{rank:1,title:'-',bonus:'설득-1'},{rank:2,title:'-',bonus:null},{rank:3,title:'노련한 무역상',bonus:'다재다능-1'},{rank:4,title:'-',bonus:null},{rank:5,title:'-',bonus:null},{rank:6,title:'-',bonus:null}],
+      broker:          [{rank:0,title:'-',bonus:null},{rank:1,title:'-',bonus:'중개-1'},{rank:2,title:'-',bonus:null},{rank:3,title:'노련한 중개인',bonus:'세상물정-1'},{rank:4,title:'-',bonus:null},{rank:5,title:'-',bonus:null},{rank:6,title:'-',bonus:null}],
+    },
+    mustering: {
+      cash:     [1000,5000,10000,20000,20000,40000,40000],
+      benefits: ['도검','int+1','edu+1','총기','함선 지분','자유 무역선','자유 무역선'],
+    },
+  },
+
+  citizen: {
+    id: 'citizen', name: '시민',
+    description: '기업, 산업 현장, 관료 조직에서 근무하거나 개척되지 않은 행성에서 새로운 삶을 만들어 가는 사람들입니다.',
+    qualification: { stat: 'edu', target: 5, dm_per_prev_career: -1 },
+    commission: null,
+    specialties: [
+      { id: 'corporate', name: '기업가', survival: { stat:'soc', target:6 }, advancement: { stat:'int', target:6 } },
+      { id: 'worker',    name: '노동자', survival: { stat:'end', target:4 }, advancement: { stat:'edu', target:8 } },
+      { id: 'colonist',  name: '개척자', survival: { stat:'int', target:7 }, advancement: { stat:'end', target:5 } },
+    ],
+    skillTables: {
+      personal:  ['edu+1','int+1','유흥','도박','운전','다재다능'],
+      service:   ['운전','비행','세상물정','근접전','접객','산업'],
+      advanced:  ['예술','변호','외교','언어','전자기기(컴퓨터)','의료'],
+      specialist_corporate: ['변호','행정','중개','전자기기(컴퓨터)','외교','지도력'],
+      specialist_worker:    ['운전','정비','전자기기','기계공학','산업','학문'],
+      specialist_colonist:  ['동물','운동','다재다능','운전','생존','경계'],
+    },
+    ranks: {
+      corporate: [{rank:0,title:'-',bonus:null},{rank:1,title:'-',bonus:null},{rank:2,title:'과장',bonus:'행정-1'},{rank:3,title:'-',bonus:null},{rank:4,title:'부장',bonus:'변호-1'},{rank:5,title:'-',bonus:null},{rank:6,title:'임원',bonus:'soc+1'}],
+      worker:    [{rank:0,title:'-',bonus:null},{rank:1,title:'-',bonus:null},{rank:2,title:'기술자',bonus:'산업-1'},{rank:3,title:'-',bonus:null},{rank:4,title:'장인',bonus:'정비-1'},{rank:5,title:'-',bonus:null},{rank:6,title:'명장',bonus:'기계공학-1'}],
+      colonist:  [{rank:0,title:'-',bonus:null},{rank:1,title:'-',bonus:null},{rank:2,title:'정착민',bonus:'생존-1'},{rank:3,title:'-',bonus:null},{rank:4,title:'탐험가',bonus:'항법-1'},{rank:5,title:'-',bonus:null},{rank:6,title:'-',bonus:'사격-1'}],
+    },
+    mustering: {
+      cash:     [2000,5000,10000,10000,10000,50000,100000],
+      benefits: ['함선 지분','조력자','int+1','총기','edu+1','함선 지분×2','여행자 지원 협회 가입'],
+    },
+  },
+
+  agent: {
+    id: 'agent', name: '요원',
+    description: '법 집행 기관, 산업 스파이, 첩보원, 그 외 그림자 속에서 일하는 사람들입니다.',
+    qualification: { stat: 'int', target: 6, dm_per_prev_career: -1 },
+    commission: null,
+    specialties: [
+      { id: 'law_enforcement', name: '법 집행',    survival: { stat:'end', target:6 }, advancement: { stat:'int', target:6 } },
+      { id: 'intelligence',    name: '첩보원',     survival: { stat:'int', target:7 }, advancement: { stat:'int', target:5 } },
+      { id: 'corporate_spy',   name: '산업 스파이', survival: { stat:'int', target:5 }, advancement: { stat:'int', target:7 } },
+    ],
+    skillTables: {
+      personal:  ['사격','dex+1','end+1','근접전','int+1','운동'],
+      service:   ['세상물정','운전','수사','비행','경계','사격'],
+      advanced:  ['변호','언어','폭발물','의료','진공복','전자기기'],
+      specialist_law_enforcement: ['수사','경계','세상물정','은신','근접전','변호'],
+      specialist_intelligence:    ['수사','경계','전자기기(통신)','은신','설득','기만'],
+      specialist_corporate_spy:   ['수사','전자기기(컴퓨터)','은신','유흥','기만','세상물정'],
+    },
+    ranks: {
+      law_enforcement: [{rank:0,title:'신입',bonus:null},{rank:1,title:'순경',bonus:'세상물정-1'},{rank:2,title:'경장',bonus:null},{rank:3,title:'경사',bonus:null},{rank:4,title:'경위',bonus:'수사-1'},{rank:5,title:'총경',bonus:'행정-1'},{rank:6,title:'치안감',bonus:'soc+1'}],
+      intelligence:    [{rank:0,title:'-',bonus:null},{rank:1,title:'요원',bonus:'기만-1'},{rank:2,title:'현장 요원',bonus:'수사-1'},{rank:3,title:'-',bonus:null},{rank:4,title:'특수 요원',bonus:'사격-1'},{rank:5,title:'부국장',bonus:null},{rank:6,title:'국장',bonus:null}],
+      corporate_spy:   [{rank:0,title:'-',bonus:null},{rank:1,title:'요원',bonus:'기만-1'},{rank:2,title:'현장 요원',bonus:'수사-1'},{rank:3,title:'-',bonus:null},{rank:4,title:'특수 요원',bonus:'사격-1'},{rank:5,title:'부국장',bonus:null},{rank:6,title:'국장',bonus:null}],
+    },
+    mustering: {
+      cash:     [1000,2000,5000,7500,10000,25000,50000],
+      benefits: ['과학 장비','int+1','함선 지분','무기','전투용 이식물','soc+1 또는 전투용 이식물','여행자 지원 협회 가입'],
+    },
+  },
+
+  army: {
+    id: 'army', name: '육군',
+    description: '행성 표면 전투를 위해 무장한 병력의 일원입니다.',
+    qualification: { stat: 'end', target: 5, dm_per_prev_career: -1, dm_age_30plus: -2 },
+    commission: { stat: 'soc', target: 8 },
+    specialties: [
+      { id: 'support',  name: '지원대',   survival: { stat:'end', target:5 }, advancement: { stat:'edu', target:7 } },
+      { id: 'infantry', name: '보병대',   survival: { stat:'str', target:6 }, advancement: { stat:'edu', target:6 } },
+      { id: 'cavalry',  name: '기갑 부대', survival: { stat:'dex', target:7 }, advancement: { stat:'int', target:5 } },
+    ],
+    skillTables: {
+      personal:  ['str+1','dex+1','end+1','도박','의료','근접전'],
+      service:   ['운전 또는 진공복','운동','사격','경계','근접전','중화기'],
+      advanced:  ['전술(지상전)','전자기기','항법','폭발물','기계공학','생존'],
+      officer:   ['전술(지상전)','지도력','변호','외교','전자기기','행정'],
+      specialist_support:  ['정비','운전 또는 비행','산업','폭발물','전자기기(통신)','의료'],
+      specialist_infantry: ['사격','근접전','중화기','은신','운동','경계'],
+      specialist_cavalry:  ['정비','운전','비행','경계','중화기(탑승형)','전자공학(감지기)'],
+    },
+    ranks: {
+      enlisted: [
+        {rank:0,title:'이등병',bonus:'사격-1'},{rank:1,title:'일병',bonus:'경계-1'},
+        {rank:2,title:'상병',bonus:null},{rank:3,title:'병장',bonus:'지도력-1'},
+        {rank:4,title:'하사',bonus:null},{rank:5,title:'중사',bonus:null},{rank:6,title:'원사',bonus:null},
+      ],
+      officer: [
+        {rank:1,title:'소위/중위',bonus:'지도력-1'},{rank:2,title:'대위',bonus:null},
+        {rank:3,title:'소령',bonus:'전술(지상전)-1'},{rank:4,title:'중령',bonus:null},
+        {rank:5,title:'대령',bonus:null},{rank:6,title:'장군',bonus:'soc-10 또는 soc+1'},
+      ],
+    },
+    mustering: {
+      cash:     [2000,5000,10000,10000,10000,20000,30000],
+      benefits: ['전투용 이식물','int+1','edu+1','무기','장갑복','end+1 또는 전투용 이식물','soc+1'],
+    },
+  },
+
+  scout: {
+    id: 'scout', name: '정찰 직군',
+    description: '각종 탐사 서비스를 제공하는 직군입니다. 미지의 지역을 탐험하고, 세계를 조사하며, 정보와 서신을 전달합니다.',
+    qualification: { stat: 'int', target: 5, dm_per_prev_career: -1 },
+    commission: null,
+    specialties: [
+      { id: 'courier',  name: '운반원', survival: { stat:'end', target:5 }, advancement: { stat:'edu', target:9 } },
+      { id: 'surveyor', name: '조사원', survival: { stat:'end', target:6 }, advancement: { stat:'int', target:8 } },
+      { id: 'explorer', name: '탐험가', survival: { stat:'end', target:7 }, advancement: { stat:'edu', target:7 } },
+    ],
+    skillTables: {
+      personal:  ['str+1','dex+1','end+1','int+1','edu+1','다재다능'],
+      service:   ['우주 비행(소형선 또는 우주선)','생존','정비','우주 항법','진공복','사격'],
+      advanced:  ['의료','항법','항해','폭발물','학문','다재다능'],
+      specialist_courier:  ['전자기기','비행','우주 비행(우주선)','기계공학','운동','우주 항법'],
+      specialist_surveyor: ['전자기기','설득','우주 비행','항법','외교','세상물정'],
+      specialist_explorer: ['전자기기','우주 비행','기계공학','학문','은신','경계'],
+    },
+    ranks: {
+      all: [
+        {rank:0,title:'-',bonus:null},{rank:1,title:'정찰대원',bonus:'진공복-1'},
+        {rank:2,title:'-',bonus:null},{rank:3,title:'상급 정찰대원',bonus:'우주 비행-1'},
+        {rank:4,title:'-',bonus:null},{rank:5,title:'-',bonus:null},{rank:6,title:'-',bonus:null},
+      ],
+    },
+    mustering: {
+      cash:     [20000,20000,30000,30000,50000,50000,50000],
+      benefits: ['함선 지분','int+1','edu+1','무기','무기','정찰선','정찰선'],
+    },
+  },
+
+  scholar: {
+    id: 'scholar', name: '학자',
+    description: '기술적으로 또는 학문적으로 과학을 연구하고 물질, 환경, 현상 등을 조사하거나, 혹은 의료 행위에 종사하는 사람들입니다.',
+    qualification: { stat: 'int', target: 6, dm_per_prev_career: -1 },
+    commission: null,
+    specialties: [
+      { id: 'field_researcher', name: '현장 연구원', survival: { stat:'end', target:6 }, advancement: { stat:'int', target:6 } },
+      { id: 'scientist',        name: '과학자',    survival: { stat:'edu', target:4 }, advancement: { stat:'int', target:8 } },
+      { id: 'physician',        name: '의료인',    survival: { stat:'edu', target:4 }, advancement: { stat:'edu', target:8 } },
+    ],
+    skillTables: {
+      personal:  ['int+1','edu+1','soc+1','dex+1','end+1','언어'],
+      service:   ['운전','전자기기','외교','의료','수사','학문'],
+      advanced:  ['예술','변호','전자기기','언어','기계공학','학문'],
+      specialist_field_researcher: ['전자기기','진공복','항법','생존','수사','학문'],
+      specialist_scientist:        ['행정','기계공학','학문','학문','전자기기','학문'],
+      specialist_physician:        ['의료','전자기기','수사','의료','설득','학문'],
+    },
+    ranks: {
+      field_researcher: [{rank:0,title:'-',bonus:null},{rank:1,title:'-',bonus:'학문-1'},{rank:2,title:'-',bonus:'전자기기(컴퓨터)-1'},{rank:3,title:'-',bonus:'수사-1'},{rank:4,title:'-',bonus:null},{rank:5,title:'-',bonus:'학문-2'},{rank:6,title:'-',bonus:null}],
+      scientist:        [{rank:0,title:'-',bonus:null},{rank:1,title:'-',bonus:'학문-1'},{rank:2,title:'-',bonus:'전자기기(컴퓨터)-1'},{rank:3,title:'-',bonus:'수사-1'},{rank:4,title:'-',bonus:null},{rank:5,title:'-',bonus:'학문-2'},{rank:6,title:'-',bonus:null}],
+      physician:        [{rank:0,title:'-',bonus:null},{rank:1,title:'-',bonus:'의료-1'},{rank:2,title:'-',bonus:null},{rank:3,title:'-',bonus:'학문-1'},{rank:4,title:'-',bonus:null},{rank:5,title:'-',bonus:'학문-2'},{rank:6,title:'-',bonus:null}],
+    },
+    mustering: {
+      cash:     [5000,10000,20000,30000,40000,60000,100000],
+      benefits: ['int+1','end+1','함선 지분×2','soc+1','과학 장비','연구선','연구선'],
+    },
+  },
+
+  navy: {
+    id: 'navy', name: '해군',
+    description: '별들 사이를 순찰하는 우주 해군의 일원입니다. 외세와 성간 무역 업계의 무법자들로부터 사회를 보호합니다.',
+    qualification: { stat: 'int', target: 6, dm_per_prev_career: -1, dm_age_34plus: -2 },
+    commission: { stat: 'soc', target: 8 },
+    specialties: [
+      { id: 'line_crew',       name: '전열 장교/선원', survival: { stat:'int', target:5 }, advancement: { stat:'edu', target:7 } },
+      { id: 'engineer_gunner', name: '기술병/포병',    survival: { stat:'int', target:6 }, advancement: { stat:'edu', target:6 } },
+      { id: 'flight',          name: '비행사',        survival: { stat:'dex', target:7 }, advancement: { stat:'edu', target:5 } },
+    ],
+    skillTables: {
+      personal:  ['str+1','dex+1','end+1','int+1','edu+1','soc+1'],
+      service:   ['우주 비행','진공복','운동','포격','정비','사격'],
+      advanced:  ['전자기기','우주 항법','기계공학','운전','항법','행정'],
+      officer:   ['지도력','전자기기','우주 비행','근접전(도검)','행정','전술(우주전)'],
+      specialist_line_crew:       ['전자기기','정비','사격','비행','근접전','진공복'],
+      specialist_engineer_gunner: ['기계공학','정비','전자기기','기계공학','포격','비행'],
+      specialist_flight:          ['우주 비행','비행','포격','우주 비행(소형선)','우주 항법','전자기기'],
+    },
+    ranks: {
+      enlisted: [
+        {rank:0,title:'선원',bonus:null},{rank:1,title:'이등병',bonus:'정비-1'},
+        {rank:2,title:'상병',bonus:'진공복-1'},{rank:3,title:'병장',bonus:null},
+        {rank:4,title:'하사',bonus:'end+1'},{rank:5,title:'중사',bonus:null},{rank:6,title:'원사',bonus:null},
+      ],
+      officer: [
+        {rank:1,title:'소위',bonus:'근접전(도검)-1'},{rank:2,title:'중위',bonus:'지도력-1'},
+        {rank:3,title:'대위',bonus:null},{rank:4,title:'중령',bonus:'전술-1'},
+        {rank:5,title:'대령',bonus:'soc-10 또는 soc+1'},{rank:6,title:'대장',bonus:'soc-12 또는 soc+1'},
+      ],
+    },
+    mustering: {
+      cash:     [1000,5000,5000,10000,20000,50000,50000],
+      benefits: ['개인용 탑승물 또는 함선 지분','int+1','edu+1 또는 함선 지분×2','무기','여행자 지원 협회 가입','부속정 또는 함선 지분×2','soc+2'],
+    },
+  },
+
+  marine: {
+    id: 'marine', name: '해병',
+    description: '우주선으로 수송되는 무장 병력의 일원입니다. 우주에서 해적 행위를 감시하고, 선상 전투를 실행합니다.',
+    qualification: { stat: 'end', target: 6, dm_per_prev_career: -1, dm_age_30plus: -2 },
+    commission: { stat: 'soc', target: 8 },
+    specialties: [
+      { id: 'support',       name: '지원대',  survival: { stat:'end', target:5 }, advancement: { stat:'edu', target:7 } },
+      { id: 'star_marine',   name: '우주 해병', survival: { stat:'end', target:6 }, advancement: { stat:'edu', target:6 } },
+      { id: 'ground_assault',name: '육전대',  survival: { stat:'end', target:7 }, advancement: { stat:'edu', target:5 } },
+    ],
+    skillTables: {
+      personal:  ['str+1','dex+1','end+1','도박','근접전(비무장)','근접전(도검)'],
+      service:   ['운동','진공복','전술','중화기','사격','은신'],
+      advanced:  ['의료','생존','폭발물','기계공학','우주 비행','항법'],
+      officer:   ['전자기기','전술','행정','변호','진공복','지도력'],
+      specialist_support:       ['전자기기','정비','운전 또는 비행','의료','중화기','사격'],
+      specialist_star_marine:   ['진공복','운동','포격','근접전(도검)','전자기기','사격'],
+      specialist_ground_assault:['진공복','중화기','경계','근접전(도검)','전술(지상전)','사격'],
+    },
+    ranks: {
+      enlisted: [
+        {rank:0,title:'해병',bonus:'사격(아무 전문 분야)-1 또는 근접전(도검)-1'},
+        {rank:1,title:'일병',bonus:'사격(아무 전문 분야)-1'},
+        {rank:2,title:'상병',bonus:null},{rank:3,title:'병장',bonus:'지도력-1'},
+        {rank:4,title:'하사',bonus:null},{rank:5,title:'중사',bonus:'end+1'},{rank:6,title:'원사',bonus:null},
+      ],
+      officer: [
+        {rank:1,title:'소위/중위',bonus:'지도력-1'},{rank:2,title:'대위',bonus:null},
+        {rank:3,title:'소령',bonus:'전술-1'},{rank:4,title:'중령',bonus:null},
+        {rank:5,title:'대령',bonus:'soc-10 또는 soc+1'},{rank:6,title:'준장',bonus:null},
+      ],
+    },
+    mustering: {
+      cash:     [2000,5000,5000,10000,20000,30000,40000],
+      benefits: ['장갑복','int+1','edu+1','무기','여행자 지원 협회 가입','장갑복 또는 end+1','soc+2'],
+    },
+  },
+}
+
+export default raw

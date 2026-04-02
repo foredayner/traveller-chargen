@@ -1,0 +1,222 @@
+{
+  "stat_modifier": {
+    "0": -3,
+    "1": -2,
+    "2": -2,
+    "3": -1,
+    "4": -1,
+    "5": -1,
+    "6": 0,
+    "7": 0,
+    "8": 0,
+    "9": 1,
+    "10": 1,
+    "11": 1,
+    "12": 2,
+    "13": 2,
+    "14": 2,
+    "15": 3
+  },
+
+  "injury_table": {
+    "1": {
+      "name": "빈사",
+      "description": "신체 특성치 한 가지를 1D 낮추고, 신체 특성치 두 가지를 2만큼 낮춥니다.",
+      "effects": [
+        { "type": "stat_physical_minus_1d", "count": 1 },
+        { "type": "stat_physical_minus_2", "count": 2 }
+      ]
+    },
+    "2": {
+      "name": "극심한 부상",
+      "description": "신체 특성치 한 가지를 1D 낮춥니다.",
+      "effects": [
+        { "type": "stat_physical_minus_1d", "count": 1 }
+      ]
+    },
+    "3": {
+      "name": "눈, 팔, 또는 다리 상실",
+      "description": "근력 또는 민첩을 2 낮춥니다.",
+      "effects": [
+        { "type": "stat_choice_minus", "stats": ["str", "dex"], "value": 2 }
+      ]
+    },
+    "4": {
+      "name": "중상",
+      "description": "큰 부상을 입고 후유증이 남습니다. 신체 특성치 한 가지를 2 낮춥니다.",
+      "effects": [
+        { "type": "stat_physical_minus", "count": 1, "value": 2 }
+      ]
+    },
+    "5": {
+      "name": "부상",
+      "description": "신체 특성치 한 가지를 1 낮춥니다.",
+      "effects": [
+        { "type": "stat_physical_minus", "count": 1, "value": 1 }
+      ]
+    },
+    "6": {
+      "name": "경상",
+      "description": "특성치 영향 없음.",
+      "effects": []
+    }
+  },
+
+  "aging_table": {
+    "note": "34세부터 경력 주기가 끝날 때마다 노화 굴림을 합니다. 2D를 굴리고 경력 주기 수에 따른 수정치를 적용합니다.",
+    "dm_per_term_after_34": -1,
+    "results": {
+      "-6": {
+        "description": "신체 특성치 세 가지를 2 낮추고, 정신 특성치 한 가지를 1 낮춥니다.",
+        "effects": [{ "type": "stat_physical_minus", "count": 3, "value": 2 }, { "type": "stat_mental_minus", "count": 1, "value": 1 }]
+      },
+      "-5": {
+        "description": "신체 특성치 세 가지를 2 낮춥니다.",
+        "effects": [{ "type": "stat_physical_minus", "count": 3, "value": 2 }]
+      },
+      "-4": {
+        "description": "신체 특성치 두 가지를 2 낮추고, 신체 특성치 한 가지를 1 낮춥니다.",
+        "effects": [{ "type": "stat_physical_minus", "count": 2, "value": 2 }, { "type": "stat_physical_minus", "count": 1, "value": 1 }]
+      },
+      "-3": {
+        "description": "신체 특성치 한 가지를 2 낮추고, 신체 특성치 두 가지를 1 낮춥니다.",
+        "effects": [{ "type": "stat_physical_minus", "count": 1, "value": 2 }, { "type": "stat_physical_minus", "count": 2, "value": 1 }]
+      },
+      "-2": {
+        "description": "신체 특성치 세 가지를 1 낮춥니다.",
+        "effects": [{ "type": "stat_physical_minus", "count": 3, "value": 1 }]
+      },
+      "-1": {
+        "description": "신체 특성치 두 가지를 1 낮춥니다.",
+        "effects": [{ "type": "stat_physical_minus", "count": 2, "value": 1 }]
+      },
+      "0": {
+        "description": "신체 특성치 한 가지를 1 낮춥니다.",
+        "effects": [{ "type": "stat_physical_minus", "count": 1, "value": 1 }]
+      },
+      "1+": {
+        "description": "영향 없음.",
+        "effects": []
+      }
+    }
+  },
+
+  "life_events": {
+    "2":  { "name": "질병 또는 부상", "description": "부상을 입거나 병에 걸립니다.", "effects": [{ "type": "injury" }] },
+    "3":  { "name": "출생 또는 사망", "description": "가족이나 친구 등 가까운 사람이 사망합니다. 혹은 가까운 사람이 출산하거나 태어납니다.", "effects": [] },
+    "4":  { "name": "연애의 끝", "description": "당신이 하고 있던 연애가 좋지 못한 결말을 맞습니다.", "effects": [{ "type": "rival_or_enemy" }] },
+    "5":  { "name": "연애의 발전", "description": "당신이 하고 있던 연애가 더 깊어집니다. 결혼이나 정서적 헌신으로 이어질 수 있습니다.", "effects": [{ "type": "ally" }] },
+    "6":  { "name": "연애의 시작", "description": "연애를 시작합니다.", "effects": [{ "type": "ally" }] },
+    "7":  { "name": "새로운 연줄", "description": "새로운 연줄을 얻습니다.", "effects": [{ "type": "contact" }] },
+    "8":  { "name": "배신", "description": "친구에게 배신당합니다. 연줄이나 조력자가 있다면 그중 한 명을 경쟁자나 적수로 바꿉니다.", "effects": [{ "type": "contact_to_rival_or_new_enemy" }] },
+    "9":  { "name": "여행", "description": "다른 세계로 이주합니다.", "effects": [{ "type": "next_qualification_dm", "value": 2 }] },
+    "10": { "name": "행운", "description": "뭔가 좋은 일이 일어납니다. 뜻밖의 돈이 생길 수도, 평생의 꿈이 이뤄질 수도 있습니다.", "effects": [{ "type": "muster_dm", "value": 2, "uses": 1 }] },
+    "11": { "name": "범죄", "description": "범죄를 저지르거나, 범죄 피해자가 되거나, 범죄 혐의로 고발됩니다.", "effects": [{ "type": "choice", "options": [{ "label": "소득 굴림 1회 잃기", "effects": [{ "type": "lose_muster_roll", "count": 1 }] }, { "label": "다음 주기 죄수 경력", "effects": [{ "type": "next_term_prisoner" }] }] }] },
+    "12": { "name": "기이한 사건", "description": "특이한 일이 일어납니다. 1D를 굴립니다.",
+      "sub_table": {
+        "1": { "name": "초능력", "description": "초능력자 단체와 연이 닿습니다. 즉시 초능력 검사를 받을 수 있으며, 합격할 경우 다음 주기에는 초능력자 경력을 수행합니다.", "effects": [{ "type": "psion_test" }] },
+        "2": { "name": "외계인", "description": "외계 종족 사이에서 시간을 보냅니다.", "effects": [{ "type": "skill", "skill": "학문", "level": 1 }, { "type": "alien_contact" }] },
+        "3": { "name": "외계 유물", "description": "보통 인간들이 접할 수 없는 외계 문화의 기묘하고 특이한 장치를 얻습니다.", "effects": [{ "type": "alien_artifact" }] },
+        "4": { "name": "기억상실", "description": "무슨 일이 일어나긴 했는데, 기억이 나지 않습니다.", "effects": [] },
+        "5": { "name": "정부 접촉", "description": "대공, 황제, 혹은 제국 첩보국 등 제국의 최상층부와 잠시 접촉하게 됩니다.", "effects": [{ "type": "high_contact" }] },
+        "6": { "name": "고대 기술", "description": "제국보다도, 어쩌면 인류보다도 오래된 뭔가를 얻습니다.", "effects": [{ "type": "ancient_tech" }] }
+      }
+    }
+  },
+
+  "background_skills": [
+    "행정", "동물(아무 전문 분야)", "예술(아무 전문 분야)", "운동(아무 전문 분야)",
+    "전자기기(아무 전문 분야)", "도박", "항법", "비행(아무 전문 분야)",
+    "세상물정", "진공복", "우주 비행(아무 전문 분야)", "근접전(아무 전문 분야)"
+  ],
+
+  "mustering_rank_bonus": {
+    "1-2": 1,
+    "3-4": 2,
+    "5-6": 3
+  },
+
+  "mustering_rank_5_6_dm": 1,
+
+  "draft_table": {
+    "1": { "career": "navy",    "specialty": null },
+    "2": { "career": "army",   "specialty": null },
+    "3": { "career": "marine", "specialty": null },
+    "4": { "career": "merchant", "specialty": "merchant_marine" },
+    "5": { "career": "scout",  "specialty": null },
+    "6": { "career": "agent",  "specialty": "law_enforcement" }
+  },
+
+  "education_prereq_advanced_table": {
+    "noble":       8,
+    "rogue":       10,
+    "entertainer": 10,
+    "drifter":     null,
+    "merchant":    8,
+    "citizen":     10,
+    "agent":       8,
+    "army":        8,
+    "scout":       8,
+    "scholar":     10,
+    "navy":        8,
+    "marine":      8
+  },
+
+  "pre_career_education": {
+    "university": {
+      "name": "대학교",
+      "description": "대부분의 세계는 주요 주거지 내에 대학교를 하나 이상 보유합니다.",
+      "qualification": { "stat": "int", "target": 6 },
+      "skills_gained": "기능 표에서 1D 굴림 2회 (자기 개발 또는 직무 관련 기능 표 중 선택)",
+      "graduation_check": { "stat": "int_or_edu", "target": 8 },
+      "graduation_bonus": "대학교 졸업 시 교육 특성치 +2, 지위 특성치 +1",
+      "career_bonus": ["미디어 직군(언론인)", "시민(기업가)", "요원", "육군", "정찰 직군", "학자", "해군", "해병"],
+      "career_qual_dm": 1,
+      "events": {
+        "1": "부정 행위: 기만 8+에 성공하면 교육 +1, 실패하면 경쟁자 획득",
+        "2": "스포츠: 운동 기능을 1레벨 향상시키거나 조력자 획득",
+        "3": "당파 싸움: 세상물정 1을 얻고, 경쟁자를 한 명 얻습니다",
+        "4": "사랑에 빠집니다: 조력자를 한 명 얻습니다",
+        "5": "학생 정치: 행정 또는 설득 기능을 1레벨 향상시킵니다",
+        "6": "공부: 어느 기능 표 굴림에서나 수정치 +2를 한 번 받습니다"
+      }
+    },
+    "military_academy": {
+      "name": "사관학교",
+      "description": "일평생 군에 복무하려는 사람에게 사관학교는 최고의 고등 교육 선택지입니다.",
+      "choices": {
+        "army_academy": {
+          "name": "육군사관학교",
+          "qualification": { "stat": "end", "target": 7 },
+          "linked_career": "army"
+        },
+        "marine_academy": {
+          "name": "해병사관학교",
+          "qualification": { "stat": "end", "target": 8 },
+          "linked_career": "marine"
+        },
+        "navy_academy": {
+          "name": "해군사관학교",
+          "qualification": { "stat": "int", "target": 8 },
+          "linked_career": "navy"
+        }
+      },
+      "skills_gained": "연계 군 경력의 모든 직무 관련 기능을 레벨 0으로 획득",
+      "graduation_check": { "stat": "end_or_int", "target": 8 },
+      "graduation_bonus": [
+        "연계 군 경력 시작 시 직무 관련 기능 표 굴림 추가 1회",
+        "연계 군 경력 첫 번째 진급 굴림에 수정치 +1",
+        "졸업 경력과 연계 군 경력이 동일 시 기능 표 굴림 추가 1회"
+      ],
+      "dropout_benefit": "연계 경력의 기초 훈련 완료로 간주",
+      "events": {
+        "1": "부상: 부상 표 굴림",
+        "2": "리더십 과제: 지도력 8+ 성공 시 지도력 1 획득, 실패 시 경쟁자",
+        "3": "혹독한 훈련: 인내 8+ 성공 시 운동 1, 실패 시 부상",
+        "4": "모의 전투: 전술 기능을 1레벨 향상시킵니다",
+        "5": "전우 사귀기: 조력자를 한 명 얻습니다",
+        "6": "스타 생도: 임관 굴림에 수정치 +1을 받습니다"
+      }
+    }
+  }
+}

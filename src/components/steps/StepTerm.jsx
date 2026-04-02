@@ -1,0 +1,585 @@
+// StepTerm.jsx — Step 5: 경력 주기 진행
+import { useState, useEffect } from 'react'
+import { useCharacterContext } from '../../store/CharacterContext.jsx'
+import { roll1D, statModifier } from '../../utils/dice.js'
+import careersData from '../../data/careersData.js'
+import { lifeEvents, injuryTable, getAgingResult, loadEventsData } from '../../data/eventsData.js'
+import EventResolver from '../EventResolver.jsx'
+import { DiceRollInline } from '../DiceAnimator.jsx'
+
+
+
+// ─── 특성치 키 맵 ─────────────────────────────────────────────
+const STAT_KEY_MAP = { str:'str',dex:'dex',end:'end',int:'int',edu:'edu',soc:'soc' }
+const STAT_KO = { str:'근력',dex:'민첩',end:'인내',int:'지능',edu:'교육',soc:'지위' }
+
+// ─── 서브스텝 상수 ───────────────────────────────────────────
+const SUB = {
+  TRAINING:    'TRAINING',
+  COMMISSION:  'COMMISSION',
+  SURVIVAL:    'SURVIVAL',
+  MISHAP:      'MISHAP',
+  EVENT:       'EVENT',
+  ADVANCEMENT: 'ADVANCEMENT',
+  AGING:       'AGING',
+  END:         'END',
+}
+
+const SUB_LABELS = {
+  TRAINING:'기초훈련', COMMISSION:'임관', SURVIVAL:'생존',
+  MISHAP:'사고', EVENT:'사건', ADVANCEMENT:'진급', AGING:'노화', END:'종료',
+}
+
+// ─── 메인 컴포넌트 ───────────────────────────────────────────
+export default function StepTerm() {
+  const { state, actions, derived } = useCharacterContext()
+  const [sub, setSub]         = useState(SUB.TRAINING)
+  const [results, setResults] = useState({})
+  const [careerEvents, setCareerEvents] = useState(null)
+
+  const career    = careersData[state.currentCareer]
+  const specialty = career?.specialties.find(s => s.id === state.currentSpecialty)
+  const isFirstTerm = state.careers.filter(c => c.careerId === state.currentCareer).length === 0
+  const needAging   = state.age >= 34
+  const hasCommission = ['army', 'navy', 'marine'].includes(state.currentCareer)
+
+  // events.json 비동기 로드
+  useEffect(() => {
+    loadEventsData().then(data => setCareerEvents(data))
+  }, [])
+
+  // ── 기초 훈련 ────────────────────────────────────────────────
+  const handleBasicTraining = (skillsGained) => {
+    actions.resolveBasicTraining(skillsGained)
+    setSub(hasCommission ? SUB.COMMISSION : SUB.SURVIVAL)
+  }
+
+  // ── 현재 주기 최고 직급 계산 (진급 굴림에서 사용) ──────────────
+  const getCurrentRank = () =>
+    state.careers
+      .filter(c => c.careerId === state.currentCareer)
+      .reduce((max, c) => Math.max(max, c.rank ?? 0), 0)
+
+  // ── 직급 보너스 기능 자동 적용 ──────────────────────────────
+  const applyRankBonus = (newRank) => {
+    const rankTable = career?.ranks
+    const rankList  = rankTable?.[state.currentSpecialty]
+      ?? rankTable?.enlisted ?? rankTable?.all ?? []
+    const rankBonus = rankList.find(r => r.rank === newRank)?.bonus
+    if (!rankBonus || rankBonus === null) return
+    const m = rankBonus.match(/^(.+)-(\d+)$/)
+    if (m) actions.applySkill(m[1].trim(), parseInt(m[2]))
+  }
+
+  // career 또는 specialty 없으면 경력 선택으로 안내
+  if (!career || !specialty) {
+    return (
+      <div className="card" style={{ textAlign:'center', padding:'2rem' }}>
+        <p style={{ color:'var(--col-text-muted)', marginBottom:'1rem', fontSize:'0.9rem' }}>
+          경력 또는 직종 정보가 없습니다. 경력을 먼저 선택해주세요.
+        </p>
+        <button className="btn btn-primary" onClick={actions.endTermChange}>← 경력 선택으로</button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {/* ── 헤딩 ── */}
+      <div className="step-heading">
+        <h2>
+          {career?.name ?? '—'} — {specialty?.name ?? '—'}
+          <span className="badge badge-cyan" style={{ marginLeft:'0.75rem', verticalAlign:'middle' }}>
+            {state.currentTerm}주기 · {state.age}세
+          </span>
+          {state.currentIsOfficer && (
+            <span className="badge badge-gold" style={{ marginLeft:'0.5rem', verticalAlign:'middle' }}>장교</span>
+          )}
+        </h2>
+        <p>경력 주기를 한 단계씩 진행합니다. 이번 주기가 끝나면 4년이 지납니다.</p>
+      </div>
+
+      {/* ── 서브스텝 진행 표시 ── */}
+      <div style={{ display:'flex', gap:'0.4rem', marginBottom:'1.5rem', flexWrap:'wrap' }}>
+        {Object.keys(SUB).filter(s => s !== 'MISHAP' || !results.survival?.success).map((s, i) => {
+          const subList = Object.keys(SUB)
+          const currentIdx = subList.indexOf(sub)
+          const thisIdx = subList.indexOf(s)
+          const status = thisIdx < currentIdx ? 'done' : thisIdx === currentIdx ? 'active' : 'pending'
+          return (
+            <span key={s} className={`badge ${status==='done'?'badge-gold':status==='active'?'badge-cyan':'badge-muted'}`}>
+              {status === 'done' ? '✓ ' : ''}{SUB_LABELS[s]}
+            </span>
+          )
+        })}
+      </div>
+
+      {/* ── 기초 훈련 ── */}
+      {sub === SUB.TRAINING && (
+        <SkillTrainingPanel
+          career={career}
+          specialty={specialty}
+          isFirstTerm={isFirstTerm}
+          onDone={handleBasicTraining}
+        />
+      )}
+
+      {/* ── 임관 굴림 ── */}
+      {sub === SUB.COMMISSION && (
+        <div className="card">
+          <div className="card-title">
+            임관 굴림 — 지위 8+
+            <span className="card-title-en">COMMISSION</span>
+          </div>
+          <p className="text-muted" style={{ fontSize:'0.82rem', marginBottom:'1rem' }}>
+            첫 주기이거나 지위 8 이상이면 임관을 시도할 수 있습니다. 성공 시 장교로 임관됩니다.
+            현재 지위: <strong style={{ color:'var(--col-cyan)', fontFamily:'var(--font-mono)' }}>{state.stats.soc ?? 0}</strong>
+          </p>
+          {!results.commission ? (
+            <div style={{ display:'flex', flexDirection:'column', gap:'0.75rem' }}>
+              <DiceRollInline
+                label="임관 굴림 — 지위 8+"
+                count={2} mod={statModifier(state.stats.soc ?? 0)}
+                target={8}
+                onResult={({ values, total, success }) => {
+                  const r = { roll: values[0]+values[1], mod: statModifier(state.stats.soc??0), total, success }
+                  setResults(rv => ({ ...rv, commission: r }))
+                  actions.rollCommission(success)
+                }}
+              />
+              <button className="btn btn-ghost" style={{ alignSelf:'flex-start' }}
+                onClick={() => setSub(SUB.SURVIVAL)}>건너뛰기 (사병 유지)</button>
+            </div>
+          ) : (
+            <>
+              <p style={{ fontSize:'0.82rem', color: results.commission.success ? 'var(--col-green)' : 'var(--col-text-muted)', marginBottom:'0.75rem' }}>
+                {results.commission.success ? '임관 성공! 장교로 임관됩니다.' : '임관 실패. 사병으로 복무합니다.'}
+              </p>
+              <button className="btn btn-primary" onClick={() => setSub(SUB.SURVIVAL)}>
+                다음 — 생존 굴림 →
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── 생존 굴림 ── */}
+      {sub === SUB.SURVIVAL && (
+        <div className="card">
+          <div className="card-title">
+            생존 굴림 — {STAT_KO[specialty?.survival.stat ?? 'end']} {specialty?.survival.target}+
+            <span className="card-title-en">SURVIVAL</span>
+          </div>
+          <p className="text-muted" style={{ fontSize:'0.82rem', marginBottom:'1rem' }}>
+            실패 시 사고 표를 굴리고 경력이 강제 종료됩니다.
+            현재 {STAT_KO[specialty?.survival.stat ?? 'end']}:{' '}
+            <strong style={{ color:'var(--col-cyan)', fontFamily:'var(--font-mono)' }}>
+              {state.stats[specialty?.survival.stat ?? 'end'] ?? 0}
+            </strong>
+          </p>
+          {!results.survival ? (
+            <DiceRollInline
+              label={`생존 굴림 — ${STAT_KO[specialty?.survival.stat ?? 'end']} ${specialty?.survival.target}+`}
+              count={2}
+              mod={statModifier(state.stats[specialty?.survival.stat ?? 'end'] ?? 0)}
+              target={specialty?.survival.target ?? 5}
+              onResult={({ values, total, success }) => {
+                const r = { roll: values[0]+values[1], mod: statModifier(state.stats[specialty?.survival.stat??'end']??0), total, success }
+                setResults(rv => ({ ...rv, survival: r }))
+                actions.resolveSurvival(success)
+                setTimeout(() => setSub(success ? SUB.EVENT : SUB.MISHAP), 900)
+              }}
+            />
+          ) : (
+            <>
+              <p style={{ fontSize:'0.82rem', color: results.survival.success ? 'var(--col-green)' : 'var(--col-red)', marginBottom:'0.75rem' }}>
+                {results.survival.success ? '생존 성공! 계속 복무합니다.' : '생존 실패! 사고 표를 굴립니다.'}
+              </p>
+              {results.survival.success && (
+                <button className="btn btn-primary" onClick={() => setSub(SUB.EVENT)}>다음 — 사건 굴림 →</button>
+              )}
+              {!results.survival.success && (
+                <button className="btn btn-danger" onClick={() => setSub(SUB.MISHAP)}>⚠ 사고 표 굴림 →</button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── 사고 표 (생존 실패) ── */}
+      {sub === SUB.MISHAP && (
+        <div className="card" style={{ borderColor:'var(--col-red)' }}>
+          <div className="card-title" style={{ color:'var(--col-red)' }}>
+            사고 표 — 1D
+            <span className="card-title-en">MISHAP TABLE</span>
+          </div>
+          {!results.mishap ? (
+            <DiceRollInline
+              label="사고 표 굴림 — 1D"
+              count={1} sides={6} mod={0}
+              variant="danger"
+              onResult={({ values }) => {
+                const mishapRoll = values[0]
+                const mishapTable = careerEvents?.[state.currentCareer]?.mishaps ?? {}
+                const mishapData = mishapTable[String(mishapRoll)] ?? { text: '부상을 입습니다.', effects: [{ type: 'injury' }] }
+                setTimeout(() => setResults(r => ({ ...r, mishap: { roll: mishapRoll, data: mishapData } })), 600)
+              }}
+            />
+          ) : (
+            <>
+              <div style={{ marginBottom:'0.75rem', fontFamily:'var(--font-mono)', fontSize:'0.78rem', color:'var(--col-text-muted)' }}>
+                1D: {results.mishap.roll}
+              </div>
+              <EventResolver
+                key={`mishap-${results.mishap.roll}`}
+                eventData={results.mishap.data}
+                isMishap={true}
+                onResolved={() => {
+                  actions.resolveMishap([], true)
+                  setSub(SUB.END)
+                }}
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── 사건 굴림 ── */}
+      {sub === SUB.EVENT && (
+        <div className="card">
+          <div className="card-title">
+            사건 굴림 — 2D
+            <span className="card-title-en">EVENT TABLE</span>
+          </div>
+          {!results.event ? (
+            <DiceRollInline
+              label="사건 표 굴림 — 2D"
+              count={2} mod={0}
+              onResult={({ values, total }) => {
+                const d1 = values[0], d2 = values[1]
+                const evTable = careerEvents?.[state.currentCareer]?.events ?? {}
+                const eventData = evTable[String(total)] ?? { text: '생활 사건이 발생합니다.', effects: [{ type: 'life_event' }] }
+                setTimeout(() => setResults(r => ({ ...r, event: { d1, d2, total, data: eventData } })), 600)
+              }}
+            />
+          ) : (
+            <>
+              <div style={{ marginBottom:'0.75rem', fontFamily:'var(--font-mono)', fontSize:'0.78rem', color:'var(--col-text-muted)' }}>
+                2D: {results.event.d1} + {results.event.d2} = {results.event.total}
+              </div>
+              <EventResolver
+                key={`event-${results.event.total}`}
+                eventData={results.event.data}
+                isMishap={false}
+                onResolved={(log) => {
+                  // auto_advance 감지 → 진급 처리 후 다음 단계
+                  const hasAutoAdvance = log?.some(l => l.tag === '진급')
+                  if (hasAutoAdvance) {
+                    const currentRank = state.careers
+                      .filter(c => c.careerId === state.currentCareer)
+                      .reduce((max, c) => Math.max(max, c.rank ?? 0), 0)
+                    const newRank = Math.min(6, currentRank + 1)
+                    actions.resolveAdvancement(true, newRank)
+                    // 직급 보너스
+                    const rankTable = career?.ranks
+                    const rankList  = rankTable?.[state.currentSpecialty]
+                      ?? rankTable?.enlisted ?? rankTable?.all ?? []
+                    const rankBonus = rankList.find(r => r.rank === newRank)?.bonus
+                    if (rankBonus) {
+                      const m = rankBonus.match(/^(.+)-(\d+)$/)
+                      if (m) actions.applySkill(m[1].trim(), parseInt(m[2]))
+                    }
+                    setResults(rv => ({ ...rv, advancement: { success: true, total: '자동', roll: 0, mod: 0 }, newRank }))
+                  }
+                  setSub(needAging ? SUB.AGING : SUB.END)
+                }}
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── 진급 굴림 ── */}
+      {sub === SUB.ADVANCEMENT && (
+        <div className="card">
+          <div className="card-title">
+            진급 굴림 — {STAT_KO[specialty?.advancement?.stat ?? 'edu']} {specialty?.advancement?.target}+
+            <span className="card-title-en">ADVANCEMENT</span>
+          </div>
+          <p className="text-muted" style={{ fontSize:'0.82rem', marginBottom:'1rem' }}>
+            현재 {STAT_KO[specialty?.advancement?.stat ?? 'edu']}:{' '}
+            <strong style={{ color:'var(--col-cyan)', fontFamily:'var(--font-mono)' }}>
+              {state.stats[specialty?.advancement?.stat ?? 'edu'] ?? 0}
+            </strong>
+          </p>
+          {!results.advancement ? (
+            <DiceRollInline
+              label={`진급 굴림 — ${STAT_KO[specialty?.advancement?.stat ?? 'edu']} ${specialty?.advancement?.target}+`}
+              count={2}
+              mod={statModifier(state.stats[specialty?.advancement?.stat ?? 'edu'] ?? 0)}
+              target={specialty?.advancement?.target ?? 7}
+              onResult={({ values, total, success }) => {
+                const newRank = success ? Math.min(6, getCurrentRank() + 1) : getCurrentRank()
+                const adv = { roll: values[0]+(values[1]??0), mod: statModifier(state.stats[specialty?.advancement?.stat??'edu']??0), total, success }
+                setResults(rv => ({ ...rv, advancement: adv, newRank }))
+                actions.resolveAdvancement(success, newRank)
+                if (success && newRank > 0) applyRankBonus(newRank)
+                setTimeout(() => setSub(needAging ? SUB.AGING : SUB.END), 900)
+              }}
+            />
+          ) : (
+            <>
+              <p style={{ fontSize:'0.82rem', color: results.advancement.success ? 'var(--col-green)' : 'var(--col-text-muted)', marginBottom:'0.75rem' }}>
+                {results.advancement.success ? `진급! 직급 → ${results.newRank}` : '진급 없음'}
+              </p>
+              <button className="btn btn-primary" onClick={() => setSub(needAging ? SUB.AGING : SUB.END)}>다음 →</button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── 노화 굴림 ── */}
+      {sub === SUB.AGING && (
+        <div className="card">
+          <div className="card-title">
+            노화 굴림 — 2D{derived.agingDm !== 0 ? ` (DM ${derived.agingDm})` : ''}
+            <span className="card-title-en">AGING</span>
+          </div>
+          <p className="text-muted" style={{ fontSize:'0.82rem', marginBottom:'1rem' }}>
+            {state.age}세. 34세 이상이므로 노화 판정을 합니다. 결과에 따라 신체 특성치가 감소합니다.
+          </p>
+          {!results.aging ? (
+            <DiceRollInline
+              label={`노화 굴림 — 2D${derived.agingDm !== 0 ? ` (DM ${derived.agingDm})` : ''}`}
+              count={2}
+              mod={derived.agingDm}
+              onResult={({ values, total }) => {
+                const agingEntry = getAgingResult(total)
+                const res = { roll: values[0]+values[1], dm: derived.agingDm, total, entry: agingEntry }
+                setResults(rv => ({ ...rv, aging: res }))
+                actions.resolveAging(agingEntry.effects ?? [])
+                setTimeout(() => setSub(SUB.END), 900)
+              }}
+            />
+          ) : (
+            <>
+              <div className={`roll-result ${results.aging.total >= 1 ? 'success' : 'failure'}`}>
+                <div className={`roll-total ${results.aging.total >= 1 ? 'success' : 'failure'}`}>
+                  {results.aging.total}
+                </div>
+                <div className="roll-detail">
+                  2D({results.aging.roll}) + DM({results.aging.dm}) = {results.aging.total}
+                  <br />
+                  {results.aging.total >= 1 ? '노화 영향 없음' : results.aging.entry?.text}
+                </div>
+              </div>
+              <button className="btn btn-primary mt-md" onClick={() => setSub(SUB.END)}>다음 →</button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── 주기 종료 ── */}
+      {sub === SUB.END && (
+        <div className="card">
+          <div className="card-title">
+            주기 완료 — 다음 행동을 선택하세요
+            <span className="card-title-en">TERM COMPLETE</span>
+          </div>
+          <div style={{ fontSize:'0.82rem', color:'var(--col-text-muted)', marginBottom:'1rem' }}>
+            {state.currentTerm}주기 완료. 나이: {state.age + 4}세가 됩니다.
+          </div>
+          <div className="choice-group">
+            <button className="btn btn-primary" onClick={actions.endTermContinue}>
+              같은 경력 계속 ({state.currentTerm + 1}주기)
+            </button>
+            <button className="btn" onClick={actions.endTermChange}>
+              다른 경력으로 전환
+            </button>
+            <button className="btn btn-ghost" onClick={actions.endTermRetire}>
+              은퇴 → 완성 단계
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── 기초 훈련 패널 ──────────────────────────────────────────
+const STAT_KO2 = { str:'근력',dex:'민첩',end:'인내',int:'지능',edu:'교육',soc:'지위' }
+
+function SkillTrainingPanel({ career, specialty, isFirstTerm, onDone }) {
+  const { state, actions } = useCharacterContext()
+  const [tableChoice, setTableChoice] = useState(null)
+  const [rollResult, setRollResult]   = useState(null)
+
+  // 기능 표 목록 구성
+  const tables = [
+    { key: 'personal', label: '자기 개발', skills: career?.skillTables?.personal ?? [] },
+    { key: 'service',  label: '직무 관련', skills: career?.skillTables?.service ?? [] },
+    ...(career?.skillTables?.advanced ? [{ key: 'advanced', label: '상급 교육', skills: career.skillTables.advanced, minEdu: 8 }] : []),
+    { key: `specialist_${specialty?.id}`, label: `직종: ${specialty?.name}`, skills: career?.skillTables?.[`specialist_${specialty?.id}`] ?? [] },
+    ...(career?.skillTables?.officer ? [{ key: 'officer', label: '장교 전용', skills: career.skillTables.officer }] : []),
+  ].filter(t => t.skills && t.skills.length > 0)
+
+  // 첫 주기: 직종 기능 모두 레벨 0으로
+  if (isFirstTerm) {
+    const specialtySkills = (career?.skillTables?.[`specialist_${specialty?.id}`] ?? [])
+      .filter(s => !s.includes('+'))
+      .map(s => ({ skill: s, level: 0 }))
+
+    return (
+      <div className="card">
+        <div className="card-title">
+          기초 훈련 — 첫 주기
+          <span className="card-title-en">BASIC TRAINING</span>
+        </div>
+        <p className="text-muted" style={{ fontSize:'0.82rem', marginBottom:'1rem' }}>
+          첫 주기에는 직종별 기능 표의 모든 기능을 레벨 0으로 습득합니다.
+        </p>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:'0.4rem', marginBottom:'1rem' }}>
+          {specialtySkills.map(({ skill }) => (
+            <span key={skill} className="badge badge-cyan">{skill} 0</span>
+          ))}
+        </div>
+        <button className="btn btn-primary" onClick={() => onDone(specialtySkills)}>
+          기초 훈련 완료 →
+        </button>
+      </div>
+    )
+  }
+
+  // 2주기 이후: 기능 표 선택 + 주사위 굴림
+  const doRoll = () => {
+    const tbl = tables.find(t => t.key === tableChoice)
+    if (!tbl) return
+    const idx = Math.floor(Math.random() * 6)  // 1D6 결과 (0-based)
+    const raw = tbl.skills[idx]
+    setRollResult({ idx: idx + 1, raw, table: tbl.label })
+  }
+
+  // +1 특성치 처리
+  const isStatBoost = rollResult?.raw?.includes('+')
+  const statKey     = isStatBoost ? rollResult.raw.replace('+1','').replace('+','').trim().toLowerCase() : null
+
+  const applyResult = (finalSkill) => {
+    if (isStatBoost) {
+      const key = statKey
+      actions.applyStatChange(key, 1)
+    } else {
+      actions.applySkill(finalSkill, 1)
+    }
+    onDone([])
+  }
+
+  return (
+    <div className="card">
+      <div className="card-title">
+        기능 표 굴림
+        <span className="card-title-en">SKILL TABLE</span>
+      </div>
+      <p className="text-muted" style={{ fontSize:'0.82rem', marginBottom:'1rem' }}>
+        기능 표 하나를 선택하고 1D를 굴려 기능을 습득합니다.
+        상급 교육 표는 교육 특성치 8 이상일 때만 선택 가능합니다.
+      </p>
+
+      {/* 표 선택 */}
+      {!rollResult && (
+        <>
+          <div style={{ display:'flex', flexDirection:'column', gap:'0.5rem', marginBottom:'1rem' }}>
+            {tables.map(t => {
+              const locked = t.minEdu && (state.stats.edu ?? 0) < t.minEdu
+              return (
+                <label key={t.key} style={{
+                  display:'flex', alignItems:'flex-start', gap:'0.75rem',
+                  padding:'0.75rem', borderRadius:'var(--radius-md)',
+                  border:`1px solid ${tableChoice === t.key ? 'var(--col-gold)' : 'var(--col-border)'}`,
+                  background: tableChoice === t.key ? 'rgba(200,168,75,0.06)' : 'var(--col-deep)',
+                  cursor: locked ? 'not-allowed' : 'pointer',
+                  opacity: locked ? 0.45 : 1,
+                }}>
+                  <input type="radio" name="table" value={t.key}
+                    checked={tableChoice === t.key}
+                    onChange={() => !locked && setTableChoice(t.key)}
+                    style={{ marginTop:'2px' }}
+                    disabled={locked}
+                  />
+                  <div>
+                    <div style={{ fontSize:'0.85rem', fontWeight:500, color: tableChoice === t.key ? 'var(--col-gold)' : 'var(--col-text)' }}>
+                      {t.label}
+                      {locked && <span className="badge badge-muted" style={{ marginLeft:'0.5rem' }}>교육 {t.minEdu}+ 필요</span>}
+                    </div>
+                    <div style={{ display:'flex', gap:'0.3rem', flexWrap:'wrap', marginTop:'0.3rem' }}>
+                      {t.skills.map((s, i) => (
+                        <span key={i} style={{ fontSize:'0.65rem', color:'var(--col-text-muted)', fontFamily:'var(--font-mono)' }}>
+                          {i+1}.{s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+          {tableChoice && (
+            <DiceRollInline
+              label={`기능 표 굴림 — 1D (${tables.find(t=>t.key===tableChoice)?.label})`}
+              count={1} sides={6} mod={0}
+              onResult={({ values }) => {
+                const tbl = tables.find(t => t.key === tableChoice)
+                const idx = values[0] - 1
+                const raw = tbl?.skills[idx] ?? '생존'
+                setTimeout(() => setRollResult({ idx: values[0], raw, table: tbl?.label ?? '' }), 600)
+              }}
+            />
+          )}
+          {!tableChoice && (
+            <p style={{ fontSize:'0.78rem', color:'var(--col-text-dim)', fontFamily:'var(--font-mono)' }}>
+              ↑ 기능 표를 먼저 선택하세요
+            </p>
+          )}
+        </>
+      )}
+
+      {/* 굴림 결과 */}
+      {rollResult && (
+        <div>
+          <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.8rem', color:'var(--col-text-muted)', marginBottom:'0.5rem' }}>
+            표: {rollResult.table} · 1D: {rollResult.idx}
+          </div>
+          {isStatBoost ? (
+            <div>
+              <p style={{ fontSize:'0.88rem', color:'var(--col-green)', marginBottom:'0.75rem' }}>
+                {STAT_KO2[statKey] ?? statKey} +1 획득!
+              </p>
+              <button className="btn btn-primary" onClick={() => applyResult(null)}>적용 →</button>
+            </div>
+          ) : (
+            <div>
+              <p style={{ fontSize:'0.88rem', color:'var(--col-cyan)', marginBottom:'0.75rem' }}>
+                기능 획득: <strong>{rollResult.raw}</strong>
+              </p>
+              <button className="btn btn-primary" onClick={() => applyResult(rollResult.raw)}>
+                {rollResult.raw} +1레벨 적용 →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── 굴림 결과 표시 ──────────────────────────────────────────
+function RollResult({ result, label }) {
+  return (
+    <div className={`roll-result ${result.success ? 'success' : 'failure'}`}>
+      <div className={`roll-total ${result.success ? 'success' : 'failure'}`}>{result.total}</div>
+      <div className="roll-detail">
+        {label}<br />
+        2D({result.roll}) + DM({result.mod ?? 0}) = {result.total} → {result.success ? '성공' : '실패'}
+      </div>
+    </div>
+  )
+}
