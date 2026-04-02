@@ -26,8 +26,11 @@ export default function StepStats() {
   const hasRolled = statRolls.length === 6
 
   // 배분된 값 → 표시할 수치
-  const getStatValue = (statKey) =>
-    hasRolled ? (statRolls[statAssignments[statKey]] ?? 0) : 0
+  const getStatValue = (statKey) => {
+    if (!hasRolled) return 0
+    const roll = statRolls[statAssignments[statKey]]
+    return (typeof roll === 'object' ? roll?.total : roll) ?? 0
+  }
 
   // 전체 굴림
   const handleRollAll = () => {
@@ -99,36 +102,36 @@ export default function StepStats() {
             굴림 결과
             <span className="card-title-en">RAW ROLLS</span>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {statRolls.map((val, i) => {
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            {statRolls.map((rollData, i) => {
               const usedByStat = Object.entries(statAssignments).find(([, idx]) => idx === i)?.[0]
+              const total = typeof rollData === 'object' ? rollData.total : rollData
+              const d1    = typeof rollData === 'object' ? rollData.d1 : null
+              const d2    = typeof rollData === 'object' ? rollData.d2 : null
+              const diceColor = usedByStat ? 'var(--col-gold)' : 'var(--col-cyan)'
               return (
-                <div
-                  key={i}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '4px',
-                    minWidth: '52px',
-                  }}
-                >
-                  <DiceFace
-                    value={val}
-                    size={48}
-                    color={usedByStat ? 'var(--col-gold)' : 'var(--col-cyan)'}
-                    glowing={!!usedByStat}
-                    rolling={animating}
-                  />
-                  <span style={{ fontSize: '0.6rem', color: 'var(--col-text-dim)', fontFamily: 'var(--font-mono)' }}>
+                <div key={i} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'4px', minWidth:'64px' }}>
+                  {/* 주사위 2개 나란히 */}
+                  <div style={{ display:'flex', gap:'4px', alignItems:'center' }}>
+                    {d1 !== null
+                      ? <>
+                          <DiceFace value={d1} size={36} color={diceColor} glowing={!!usedByStat} rolling={animating} />
+                          <DiceFace value={d2} size={36} color={diceColor} glowing={!!usedByStat} rolling={animating} />
+                        </>
+                      : <DiceFace value={total} size={44} color={diceColor} glowing={!!usedByStat} rolling={animating} />
+                    }
+                  </div>
+                  {/* 합계 */}
+                  <div style={{ fontFamily:'var(--font-mono)', fontSize:'1rem', fontWeight:500, color:usedByStat?'var(--col-gold)':'var(--col-cyan)' }}>
+                    {total}
+                  </div>
+                  {/* 배분된 특성치 표시 */}
+                  <span style={{ fontSize:'0.6rem', color:'var(--col-text-dim)', fontFamily:'var(--font-mono)', letterSpacing:'0.05em' }}>
                     {usedByStat ? STAT_NAMES_EN[usedByStat] : '—'}
                   </span>
-                  <button
-                    className="btn btn-ghost"
-                    style={{ fontSize: '0.6rem', padding: '2px 6px' }}
-                    onClick={() => handleRerollOne(i)}
-                    title="이 주사위만 다시 굴리기"
-                  >
+                  {/* 단일 재굴림 */}
+                  <button className="btn btn-ghost" style={{ fontSize:'0.6rem', padding:'2px 6px' }}
+                    onClick={() => actions.rerollOneStat(i)} title="이 주사위만 다시 굴리기">
                     ↺
                   </button>
                 </div>

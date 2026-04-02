@@ -61,12 +61,18 @@ export function useCharacter() {
 
   // Step 1: 특성치
   const rollAllStats = useCallback(() => {
-    const rolls = Array.from({ length: 6 }, () => roll2D())
+    const rolls = Array.from({ length: 6 }, () => {
+      const d1 = Math.floor(Math.random() * 6) + 1
+      const d2 = Math.floor(Math.random() * 6) + 1
+      return { d1, d2, total: d1 + d2 }
+    })
     dispatch({ type: A.ROLL_STATS, rolls })
   }, [])
 
   const rerollOneStat = useCallback((index) => {
-    dispatch({ type: A.SET_STAT_ROLL, index, roll: roll2D() })
+    const d1 = Math.floor(Math.random() * 6) + 1
+    const d2 = Math.floor(Math.random() * 6) + 1
+    dispatch({ type: A.SET_STAT_ROLL, index, roll: { d1, d2, total: d1 + d2 } })
   }, [])
 
   const assignStat = useCallback((stat, rollIndex) => {

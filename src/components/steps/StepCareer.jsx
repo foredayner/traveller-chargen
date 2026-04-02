@@ -1,12 +1,22 @@
 // StepCareer.jsx — Step 4: 경력 선택 + 자격 굴림
 import { useState } from 'react'
 import { useCharacterContext } from '../../store/CharacterContext.jsx'
-import { roll1D, statModifier } from '../../utils/dice.js'
+import { statModifier } from '../../utils/dice.js'
 import careersData from '../../data/careersData.js'
 import { DiceRollInline } from '../DiceAnimator.jsx'
 
-// 징병 표
+// 징병 표 (1D 결과 순서)
 const DRAFT_TABLE = ['navy', 'army', 'marine', 'merchant', 'scout', 'agent']
+
+// 징병 경력별 설명
+const DRAFT_DESC = {
+  navy:     '제국 해군에 입대합니다. 별들 사이를 순찰하며 외세와 무법자들로부터 제국을 수호합니다.',
+  army:     '행성 육군에 입대합니다. 행성 표면 전투와 방어 임무를 수행합니다.',
+  marine:   '해병대에 입대합니다. 우주선 간 전투와 선상 전투 임무를 수행합니다.',
+  merchant: '상선단에 배정됩니다. 성간 무역로를 항해하며 화물과 승객을 수송합니다.',
+  scout:    '정찰대에 배정됩니다. 미지의 항성계를 탐험하고 정보를 수집합니다.',
+  agent:    '법 집행 기관에 배정됩니다. 치안 유지와 범죄 수사를 담당합니다.',
+}
 
 export default function StepCareer() {
   const { state, actions } = useCharacterContext()
@@ -47,20 +57,47 @@ export default function StepCareer() {
         </div>
         <div className="choice-group">
           {!hasDrafted && (
-            <button className="btn btn-danger" onClick={handleDraft}>
-              🎲 징병 굴림 (1D)
+            <DiceRollInline
+              label="징병 굴림 — 1D"
+              count={1} sides={6} mod={0}
+              variant="danger"
+              onResult={({ values }) => {
+                const roll = values[0]
+                const careerId = DRAFT_TABLE[roll - 1]
+                const defaultSpecialty = careersData[careerId]?.specialties?.[0]?.id ?? null
+                setTimeout(() => {
+                  setDraftResult({ roll, careerId })
+                  actions.acceptDraft(careerId, defaultSpecialty)
+                }, 700)
+              }}
+            />
+          )}
+          {!draftResult && (
+            <button className="btn btn-ghost" onClick={handleDrifter}>
+              방랑자로 경력 시작
             </button>
           )}
-          <button className="btn btn-ghost" onClick={handleDrifter}>
-            방랑자로 경력 시작
-          </button>
         </div>
         {draftResult && (
-          <div className="event-card mt-md">
-            <div className="event-roll-label">징병 굴림 결과: {draftResult.roll}</div>
-            <div className="event-text">
-              {careersData[draftResult.careerId]?.name ?? draftResult.careerId} 경력으로 징병되었습니다.
+          <div style={{
+            padding:'1rem', marginTop:'0.75rem',
+            background:'rgba(224,82,82,0.07)',
+            border:'1px solid rgba(224,82,82,0.3)',
+            borderLeft:'3px solid var(--col-red)',
+            borderRadius:'var(--radius-md)',
+          }}>
+            <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.7rem', color:'var(--col-red)', marginBottom:'0.5rem' }}>
+              ⚔ 징병 1D: {draftResult.roll}
             </div>
+            <div style={{ fontSize:'0.92rem', color:'var(--col-text)', marginBottom:'0.35rem' }}>
+              <strong style={{ color:'var(--col-gold)' }}>{careersData[draftResult.careerId]?.name}</strong> 경력으로 징병되었습니다.
+            </div>
+            <div style={{ fontSize:'0.78rem', color:'var(--col-text-muted)', marginBottom:'0.75rem' }}>
+              {DRAFT_DESC[draftResult.careerId] ?? '군 복무를 시작합니다. 다음 경력 주기 진행으로 이어집니다.'}
+            </div>
+            <button className="btn btn-primary" onClick={actions.startTerm}>
+              경력 주기 시작 →
+            </button>
           </div>
         )}
       </div>
@@ -96,29 +133,97 @@ export default function StepCareer() {
         ))}
       </div>
 
-      {/* 직종 선택 */}
-      {currentCareer && (
-        <div className="card mt-md">
+      {/* ── 경력 상세 정보 패널 ── */}
+      {currentCareer && career && (
+        <div className="card mt-md" style={{ borderColor:'var(--col-gold-dim)' }}>
           <div className="card-title">
-            {career.name} — 직종 선택
-            <span className="card-title-en">SPECIALTY</span>
+            {career.name} — 경력 상세
+            <span className="card-title-en">CAREER DETAIL</span>
           </div>
-          <div className="choice-group">
-            {career.specialties.map(sp => (
-              <button
-                key={sp.id}
-                className={`btn ${currentSpecialty === sp.id ? 'btn-primary' : 'btn-ghost'}`}
-                onClick={() => actions.selectSpecialty(sp.id)}
-              >
-                {sp.name}
-                <span style={{ display: 'block', fontSize: '0.6rem', color: 'var(--col-text-muted)', fontFamily: 'var(--font-mono)' }}>
-                  생존 {sp.survival.stat.toUpperCase()} {sp.survival.target}+
-                </span>
-              </button>
-            ))}
+
+          {/* 경력 설명 */}
+          {career.description && (
+            <p style={{ fontSize:'0.84rem', color:'var(--col-text-muted)', marginBottom:'1rem', lineHeight:1.6 }}>
+              {career.description}
+            </p>
+          )}
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' }}>
+            {/* 직종별 생존/진급 */}
+            <div>
+              <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.65rem', color:'var(--col-text-dim)', letterSpacing:'0.1em', marginBottom:'0.5rem' }}>
+                직종 / 생존 / 진급
+              </div>
+              {career.specialties.map(sp => (
+                <div key={sp.id}
+                  onClick={() => actions.selectSpecialty(sp.id)}
+                  style={{
+                    padding:'0.4rem 0.6rem', marginBottom:'4px',
+                    border:`1px solid ${currentSpecialty===sp.id?'var(--col-gold)':'var(--col-border)'}`,
+                    borderRadius:'var(--radius-sm)',
+                    background: currentSpecialty===sp.id?'rgba(200,168,75,0.06)':'var(--col-deep)',
+                    fontSize:'0.78rem', cursor:'pointer', transition:'all 0.15s',
+                  }}>
+                  <span style={{ color:currentSpecialty===sp.id?'var(--col-gold)':'var(--col-text)', fontWeight:500 }}>{sp.name}</span>
+                  <span style={{ fontFamily:'var(--font-mono)', fontSize:'0.65rem', color:'var(--col-text-muted)', marginLeft:'0.5rem' }}>
+                    생존 {sp.survival.stat.toUpperCase()}{sp.survival.target}+ · 진급 {sp.advancement.stat.toUpperCase()}{sp.advancement.target}+
+                  </span>
+                  {currentSpecialty===sp.id && <span style={{ marginLeft:'0.5rem', color:'var(--col-gold)', fontSize:'0.65rem' }}>✓ 선택됨</span>}
+                </div>
+              ))}
+            </div>
+
+            {/* 퇴직 소득 표 미리보기 */}
+            <div>
+              <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.65rem', color:'var(--col-text-dim)', letterSpacing:'0.1em', marginBottom:'0.5rem' }}>
+                퇴직 소득 표
+              </div>
+              <div style={{ fontSize:'0.7rem', fontFamily:'var(--font-mono)', display:'grid', gridTemplateColumns:'auto 1fr 1fr', gap:'2px 8px' }}>
+                <span style={{ color:'var(--col-text-dim)' }}>1D</span>
+                <span style={{ color:'var(--col-text-muted)' }}>현금</span>
+                <span style={{ color:'var(--col-text-muted)' }}>소득</span>
+                {Array.from({ length:7 }, (_,i) => [
+                  <span key={`n${i}`} style={{ color:'var(--col-text-dim)' }}>{i+1}</span>,
+                  <span key={`c${i}`} style={{ color:'var(--col-gold)', fontSize:'0.65rem' }}>
+                    Cr {(career.mustering?.cash?.[i]??0).toLocaleString()}
+                  </span>,
+                  <span key={`b${i}`} style={{ color:'var(--col-cyan)', fontSize:'0.65rem', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    {career.mustering?.benefits?.[i]??'—'}
+                  </span>,
+                ])}
+              </div>
+            </div>
+          </div>
+
+          {/* 기능 표 미리보기 */}
+          <div style={{ marginTop:'1rem' }}>
+            <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.65rem', color:'var(--col-text-dim)', letterSpacing:'0.1em', marginBottom:'0.5rem' }}>
+              기능과 훈련 표
+            </div>
+            <div style={{ display:'flex', gap:'0.5rem', flexWrap:'wrap' }}>
+              {[
+                { key:'personal', label:'자기 개발' },
+                { key:'service',  label:'직무 관련' },
+                { key:'advanced', label:'상급 교육' },
+                ...(career.skillTables?.officer ? [{ key:'officer', label:'장교 전용' }] : []),
+              ].filter(t => career.skillTables?.[t.key]).map(t => (
+                <div key={t.key} style={{
+                  background:'var(--col-deep)', border:'1px solid var(--col-border)',
+                  borderRadius:'var(--radius-sm)', padding:'0.4rem 0.6rem', minWidth:'110px',
+                }}>
+                  <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.6rem', color:'var(--col-text-dim)', marginBottom:'3px' }}>{t.label}</div>
+                  {career.skillTables[t.key].map((s,i) => (
+                    <div key={i} style={{ fontSize:'0.65rem', color:'var(--col-text-muted)' }}>
+                      <span style={{ color:'var(--col-text-dim)', marginRight:'3px' }}>{i+1}.</span>{s}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
+
 
       {/* 자격 굴림 */}
       {currentCareer && currentSpecialty && (

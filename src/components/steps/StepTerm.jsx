@@ -227,8 +227,21 @@ export default function StepTerm() {
             />
           ) : (
             <>
-              <div style={{ marginBottom:'0.75rem', fontFamily:'var(--font-mono)', fontSize:'0.78rem', color:'var(--col-text-muted)' }}>
-                1D: {results.mishap.roll}
+              {/* 사고 결과 텍스트 카드 */}
+              <div style={{
+                background:'rgba(224,82,82,0.07)',
+                border:'1px solid rgba(224,82,82,0.3)',
+                borderLeft:'3px solid var(--col-red)',
+                borderRadius:'var(--radius-md)',
+                padding:'0.75rem 1rem',
+                marginBottom:'0.75rem',
+              }}>
+                <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.65rem', color:'var(--col-red)', marginBottom:'4px' }}>
+                  ⚠ 사고 표 {results.mishap.roll} — {state.currentCareer?.toUpperCase()}
+                </div>
+                <div style={{ fontSize:'0.92rem', color:'var(--col-text)', lineHeight:1.6 }}>
+                  {results.mishap.data?.text ?? '사고가 발생합니다.'}
+                </div>
               </div>
               <EventResolver
                 key={`mishap-${results.mishap.roll}`}
@@ -264,8 +277,21 @@ export default function StepTerm() {
             />
           ) : (
             <>
-              <div style={{ marginBottom:'0.75rem', fontFamily:'var(--font-mono)', fontSize:'0.78rem', color:'var(--col-text-muted)' }}>
-                2D: {results.event.d1} + {results.event.d2} = {results.event.total}
+              {/* 사건 결과 텍스트 카드 */}
+              <div style={{
+                background:'rgba(200,168,75,0.07)',
+                border:'1px solid var(--col-gold-dim)',
+                borderLeft:'3px solid var(--col-gold)',
+                borderRadius:'var(--radius-md)',
+                padding:'0.75rem 1rem',
+                marginBottom:'0.75rem',
+              }}>
+                <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.65rem', color:'var(--col-text-muted)', marginBottom:'4px' }}>
+                  ✦ 사건 표 {results.event.d1}+{results.event.d2}={results.event.total} — {state.currentCareer?.toUpperCase()}
+                </div>
+                <div style={{ fontSize:'0.92rem', color:'var(--col-text)', lineHeight:1.6 }}>
+                  {results.event.data?.text ?? '사건이 발생합니다.'}
+                </div>
               </div>
               <EventResolver
                 key={`event-${results.event.total}`}

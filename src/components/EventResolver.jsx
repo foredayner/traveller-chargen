@@ -18,6 +18,20 @@ import { useState, useCallback } from 'react'
 import { useCharacterContext } from '../store/CharacterContext.jsx'
 import { checkStat, checkSkill, roll1D, roll2D, rollInjuryTable } from '../utils/dice.js'
 import { lifeEvents, injuryTable, getAgingResult } from '../data/eventsData.js'
+
+// D66 NPC 표 (룰북 86p)
+const NPC_TABLE_LOCAL = {
+  11:'해군 장교',12:'제국 외교관',13:'파렴치한 상인',14:'의사',15:'괴짜 과학자',16:'용병',
+  21:'유명 공연자',22:'외계인 도둑',23:'자유 무역상',24:'탐험가',25:'해병 대위',26:'기업 임원',
+  31:'연구자',32:'문화 주재관',33:'종교계 지도자',34:'음모 가담자',35:'부유한 귀족',36:'인공지능',
+  41:'따분해하는 귀족',42:'행성 총독',43:'도박 중독자',44:'사회 고발 중인 언론인',45:'종말론자 사교도',46:'기업 비밀 요원',
+  51:'범죄 조직',52:'군정 장관',53:'육군 보급 장교',54:'사설탐정',55:'우주항 관리자',56:'퇴역한 제독',
+  61:'외계 대사',62:'밀수업자',63:'무기 검사관',64:'나이 든 정치인',65:'행성 군벌 지도자',66:'제국 비밀 요원',
+}
+function rollD66npc() {
+  const d1=Math.floor(Math.random()*6)+1; const d2=Math.floor(Math.random()*6)+1
+  return NPC_TABLE_LOCAL[d1*10+d2] ?? '알 수 없는 인물'
+}
 import { DiceRollInline, DiceFace } from './DiceAnimator.jsx'
 
 // ─── 특성치 한국어 → 코드 키 ──────────────────────────────────
@@ -322,9 +336,16 @@ function EffectHandler({ effect, state, actions, isMishap, onDone }) {
 // ── 자동: 연줄 추가 ───────────────────────────────────────────
 function AutoContactEffect({ effect, actions, onDone }) {
   const type = effect.type  // 'ally' | 'contact' | 'rival' | 'enemy'
-  const desc = effect.description ?? ''
   const colorMap = { ally:'var(--col-green)', contact:'var(--col-cyan)', rival:'var(--col-amber)', enemy:'var(--col-red)' }
   const kindMap  = { ally:'gain', contact:'contact', rival:'loss', enemy:'loss' }
+  const [desc, setDesc] = useState(effect.description ?? '')
+  const [rolled, setRolled] = useState(false)
+
+  const rollRandom = () => {
+    const npc = rollD66npc()
+    setDesc(npc)
+    setRolled(true)
+  }
 
   const apply = () => {
     actions.addContact(type, desc)
@@ -332,12 +353,33 @@ function AutoContactEffect({ effect, actions, onDone }) {
   }
 
   return (
-    <ConfirmCard
-      label={`${CONTACT_LABELS[type]} 획득`}
-      color={colorMap[type]}
-      detail={desc || `새 ${CONTACT_LABELS[type]}을(를) 얻습니다.`}
-      onConfirm={apply}
-    />
+    <div className="card" style={{ marginBottom:'0.75rem', borderColor: colorMap[type] }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'0.5rem' }}>
+        <span style={{ color: colorMap[type], fontWeight:500, fontSize:'0.88rem' }}>
+          {CONTACT_LABELS[type]} 획득
+        </span>
+        <button className="btn btn-ghost" style={{ fontSize:'0.7rem', padding:'0.2rem 0.6rem' }}
+          onClick={rollRandom}>🎲 D66 무작위 생성</button>
+      </div>
+      <div style={{ marginBottom:'0.5rem' }}>
+        <input
+          type="text"
+          value={desc}
+          onChange={e=>setDesc(e.target.value)}
+          placeholder={`${CONTACT_LABELS[type]} 설명 (선택사항) — 직접 입력하거나 무작위 생성`}
+          style={{ fontSize:'0.82rem' }}
+        />
+        {rolled && desc && (
+          <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.68rem', color: colorMap[type], marginTop:'3px' }}>
+            D66 결과: {desc}
+          </div>
+        )}
+      </div>
+      <button className="btn btn-primary" style={{ borderColor: colorMap[type], color: colorMap[type], background:`${colorMap[type]}15` }}
+        onClick={apply}>
+        적용
+      </button>
+    </div>
   )
 }
 

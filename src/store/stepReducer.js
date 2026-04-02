@@ -208,7 +208,8 @@ export function characterReducer(state, action) {
       const { statRolls, statAssignments } = state
       const stats = {}
       for (const [statKey, rollIdx] of Object.entries(statAssignments)) {
-        stats[statKey] = statRolls[rollIdx] ?? 0
+        const roll = statRolls[rollIdx]
+        stats[statKey] = (typeof roll === 'object' ? roll.total : roll) ?? 0
       }
       return { ...state, stats, step: STEPS.BACKGROUND }
     }

@@ -6,6 +6,7 @@
 
 import { useCharacterContext } from './store/CharacterContext.jsx'
 import { STEPS } from './store/stepReducer.js'
+import SideSheet from './components/SideSheet.jsx'
 
 // Step 컴포넌트들 (각각 별도 파일)
 import StepStats      from './components/steps/StepStats.jsx'
@@ -104,19 +105,30 @@ export default function App() {
 
       {/* ── 메인 콘텐츠 ── */}
       <main className="app-main">
-        <div className="step-panel">
-          {step === STEPS.STATS      && <StepStats />}
-          {step === STEPS.BACKGROUND && <StepBackground />}
-          {step === STEPS.PRE_CAREER && <StepPreCareer />}
-          {step === STEPS.CAREER     && <StepCareer key={`career-${state.careers.length}`} />}
-          {step === STEPS.TERM       && <StepTerm   key={`term-${state.currentCareer}-${state.currentTerm}`} />}
-          {step === STEPS.FINISH     && <StepFinish />}
+        <div className="app-content">
+          <div className="step-panel">
+            {step === STEPS.STATS      && <StepStats />}
+            {step === STEPS.BACKGROUND && <StepBackground />}
+            {step === STEPS.PRE_CAREER && <StepPreCareer />}
+            {step === STEPS.CAREER     && <StepCareer key={`career-${state.careers.length}`} />}
+            {step === STEPS.TERM       && <StepTerm   key={`term-${state.currentCareer}-${state.currentTerm}`} />}
+            {step === STEPS.FINISH     && <StepFinish />}
+          </div>
+          <SideSheet />
         </div>
       </main>
 
       {/* ── 푸터 ── */}
       <footer className="app-footer">
-        <span>Traveller © Mongoose Publishing 2020 — 팬 제작 툴</span>
+        <div style={{ display:'flex', flexDirection:'column', gap:'2px' }}>
+          <span>
+            이 툴은 비공식 팬 제작 도구입니다. Traveller는 Far Future Enterprises의 등록상표입니다.
+          </span>
+          <span style={{ opacity: 0.6 }}>
+            Traveller Core Rulebook © 2020 Mongoose Publishing · 한국어판 © 2022 초이스 엔터테인먼트 ·
+            This fan tool is not affiliated with or endorsed by Mongoose Publishing.
+          </span>
+        </div>
         <span className="footer-age">
           {state.age > 18 ? `나이 ${state.age}세` : ''}
         </span>

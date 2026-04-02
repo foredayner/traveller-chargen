@@ -844,3 +844,80 @@ label:has(input[type="radio"]):hover {
 
   h2 { color: #333 !important; font-size: 14pt !important; }
 }
+
+/* ── 2-column 앱 레이아웃 ── */
+.app-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.step-panel {
+  /* max-width 제거 — app-content grid가 제어 */
+  min-width: 0;
+  animation: panelFadeIn 0.3s ease forwards;
+}
+
+/* ── 사이드 시트 ── */
+.side-sheet {
+  position: sticky;
+  top: 1.5rem;
+  background: var(--col-surface);
+  border: 1px solid var(--col-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  max-height: calc(100dvh - 180px);
+  overflow-y: auto;
+}
+
+.side-sheet__header {
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, rgba(200,168,75,0.1) 0%, transparent 60%);
+  border-bottom: 1px solid var(--col-border);
+}
+
+.side-section {
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid rgba(30,45,74,0.5);
+}
+.side-section:last-child { border-bottom: none; }
+
+.side-label {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  color: var(--col-text-dim);
+  text-transform: uppercase;
+  margin-bottom: 0.35rem;
+}
+
+.side-value {
+  font-size: 0.88rem;
+  color: var(--col-text);
+}
+
+/* 스크롤바 스타일 (사이드시트) */
+.side-sheet::-webkit-scrollbar { width: 4px; }
+.side-sheet::-webkit-scrollbar-track { background: transparent; }
+.side-sheet::-webkit-scrollbar-thumb { background: var(--col-border-lit); border-radius: 2px; }
+
+/* ── 반응형 — 좁은 화면에서 사이드시트 숨김 ── */
+@media (max-width: 900px) {
+  .app-content { grid-template-columns: 1fr; }
+  .side-sheet  { display: none; }
+}
+
+@media print {
+  .side-sheet  { display: none !important; }
+  .app-content { grid-template-columns: 1fr !important; }
+}
+
+/* ── 푸터 확장 ── */
+.app-footer {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.62rem;
+}
