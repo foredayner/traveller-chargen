@@ -126,20 +126,37 @@ export default function StepCareer() {
 
       {/* 경력 그리드 */}
       <div className="career-grid">
-        {Object.entries(careersData).map(([id, c]) => (
-          <div
-            key={id}
-            className={`career-card ${currentCareer === id ? 'selected' : ''}`}
-            onClick={() => { actions.selectCareer(id); setQualResult(null) }}
-          >
-            <div className="career-card-name">{c.name}</div>
-            <div className="career-card-req">
-              {c.qualification.stat
-                ? `자격: ${c.qualification.stat.toUpperCase()} ${c.qualification.target}+`
-                : '자격: 자동 성공'}
+        {Object.entries(careersData).map(([id, c]) => {
+          const gb = state.gradBenefits
+          const isAutoQual   = !gb.usedQualDm && gb.autoQual === id
+          const isEligibleDm = !gb.usedQualDm && gb.qualDm > 0 && gb.qualEligible?.includes(id)
+          return (
+            <div
+              key={id}
+              className={`career-card ${currentCareer === id ? 'selected' : ''} ${isAutoQual ? 'career-card--highlight' : ''}`}
+              onClick={() => { actions.selectCareer(id); setQualResult(null) }}
+            >
+              <div className="career-card-name">{c.name}</div>
+              <div className="career-card-req">
+                {isAutoQual
+                  ? <span style={{color:'var(--col-green)',fontWeight:500}}>✓ 자격 자동 성공 (사관학교)</span>
+                  : c.qualification.stat
+                    ? `자격: ${c.qualification.stat.toUpperCase()} ${c.qualification.target}+`
+                    : '자격: 자동 성공'}
+              </div>
+              {isEligibleDm && (
+                <div style={{marginTop:'3px',fontFamily:'var(--font-mono)',fontSize:'0.62rem',color:'var(--col-gold)'}}>
+                  ✦ 졸업 혜택 자격 DM +{gb.qualDm}
+                </div>
+              )}
+              {isAutoQual && gb.canCommission && (
+                <div style={{marginTop:'3px',fontFamily:'var(--font-mono)',fontSize:'0.62rem',color:'var(--col-cyan)'}}>
+                  임관 굴림 {gb.commissionDm === 99 ? '자동 성공' : `DM +${gb.commissionDm}`}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* ── 경력 상세 정보 패널 ── */}
@@ -204,23 +221,26 @@ export default function StepCareer() {
             </div>
           </div>
 
-          {/* 기능 표 미리보기 */}
+          {/* 기능과 훈련 표 — 공통 + 직종별 */}
           <div style={{ marginTop:'1rem' }}>
             <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.65rem', color:'var(--col-text-dim)', letterSpacing:'0.1em', marginBottom:'0.5rem' }}>
               기능과 훈련 표
             </div>
-            <div style={{ display:'flex', gap:'0.5rem', flexWrap:'wrap' }}>
+            {/* 공통 표: 자기개발, 직무관련, 상급교육, 장교전용 */}
+            <div style={{ display:'flex', gap:'0.5rem', flexWrap:'wrap', marginBottom:'0.75rem' }}>
               {[
                 { key:'personal', label:'자기 개발' },
                 { key:'service',  label:'직무 관련' },
-                { key:'advanced', label:'상급 교육' },
-                ...(career.skillTables?.officer ? [{ key:'officer', label:'장교 전용' }] : []),
+                { key:'advanced', label:'상급 교육', note:'교육 8+' },
+                ...(career.skillTables?.officer ? [{ key:'officer', label:'장교 전용', note:'장교만' }] : []),
               ].filter(t => career.skillTables?.[t.key]).map(t => (
                 <div key={t.key} style={{
                   background:'var(--col-deep)', border:'1px solid var(--col-border)',
                   borderRadius:'var(--radius-sm)', padding:'0.4rem 0.6rem', minWidth:'110px',
                 }}>
-                  <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.6rem', color:'var(--col-text-dim)', marginBottom:'3px' }}>{t.label}</div>
+                  <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.6rem', color:'var(--col-text-dim)', marginBottom:'3px' }}>
+                    {t.label}{t.note && <span style={{color:'var(--col-amber)',marginLeft:'4px'}}>({t.note})</span>}
+                  </div>
                   {career.skillTables[t.key].map((s,i) => (
                     <div key={i} style={{ fontSize:'0.65rem', color:'var(--col-text-muted)' }}>
                       <span style={{ color:'var(--col-text-dim)', marginRight:'3px' }}>{i+1}.</span>{s}
@@ -228,6 +248,42 @@ export default function StepCareer() {
                   ))}
                 </div>
               ))}
+            </div>
+            {/* 직종별 표 */}
+            <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.62rem', color:'var(--col-text-dim)', letterSpacing:'0.08em', marginBottom:'0.4rem' }}>
+              직종별 기능 표
+            </div>
+            <div style={{ display:'flex', gap:'0.5rem', flexWrap:'wrap' }}>
+              {career.specialties.map(sp => {
+                const spKey = `specialist_${sp.id}`
+                const spSkills = career.skillTables?.[spKey] ?? []
+                const isSelected = currentSpecialty === sp.id
+                return (
+                  <div key={sp.id}
+                    onClick={() => actions.selectSpecialty(sp.id)}
+                    style={{
+                      background: isSelected ? 'rgba(200,168,75,0.06)' : 'var(--col-deep)',
+                      border: `1px solid ${isSelected ? 'var(--col-gold)' : 'var(--col-border)'}`,
+                      borderRadius:'var(--radius-sm)', padding:'0.4rem 0.6rem', minWidth:'110px',
+                      cursor:'pointer', transition:'all 0.15s',
+                    }}>
+                    <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.6rem', color: isSelected ? 'var(--col-gold)' : 'var(--col-text-dim)', marginBottom:'2px', fontWeight: isSelected ? 600 : 400 }}>
+                      {sp.name} {isSelected && '✓'}
+                    </div>
+                    <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.55rem', color:'var(--col-text-dim)', marginBottom:'4px' }}>
+                      생존 {sp.survival.stat.toUpperCase()}{sp.survival.target}+ · 진급 {sp.advancement.stat.toUpperCase()}{sp.advancement.target}+
+                    </div>
+                    {spSkills.length > 0
+                      ? spSkills.map((s,i) => (
+                          <div key={i} style={{ fontSize:'0.65rem', color:'var(--col-text-muted)' }}>
+                            <span style={{ color:'var(--col-text-dim)', marginRight:'3px' }}>{i+1}.</span>{s}
+                          </div>
+                        ))
+                      : <div style={{ fontSize:'0.65rem', color:'var(--col-text-dim)' }}>직종 표 없음</div>
+                    }
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>

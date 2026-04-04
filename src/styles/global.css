@@ -921,3 +921,12 @@ label:has(input[type="radio"]):hover {
   gap: 0.5rem;
   font-size: 0.62rem;
 }
+
+/* ── 졸업 혜택 경력 카드 강조 ── */
+.career-card--highlight {
+  border-color: var(--col-green) !important;
+  box-shadow: 0 0 12px rgba(78, 205, 196, 0.15);
+}
+.career-card--highlight::before {
+  background: linear-gradient(135deg, rgba(78,205,196,0.08) 0%, transparent 60%);
+}

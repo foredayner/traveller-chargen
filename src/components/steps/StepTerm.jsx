@@ -383,16 +383,18 @@ export default function StepTerm() {
                 eventData={results.event.data}
                 isMishap={false}
                 onResolved={(log) => {
-                  // auto_advance 감지 → 진급 처리 후 다음 단계
+                  // auto_advance 감지 → 진급 처리 후 노화/종료
                   const hasAutoAdvance = log?.some(l => l.tag === '진급')
                   if (hasAutoAdvance) {
                     const newRank = Math.min(6, (state.currentRank ?? 0) + 1)
                     actions.resolveAdvancement(true, newRank)
-                    // 직급/계급 보너스 — applyRankBonus로 통일 처리
                     applyRankBonus(newRank)
                     setResults(rv => ({ ...rv, advancement: { success: true, total: '자동', roll: 0, mod: 0 }, newRank }))
+                    setSub(needAging ? SUB.AGING : SUB.END)
+                  } else {
+                    // 일반 사건 → 반드시 진급 굴림으로
+                    setSub(SUB.ADVANCEMENT)
                   }
-                  setSub(needAging ? SUB.AGING : SUB.END)
                 }}
               />
             </>
