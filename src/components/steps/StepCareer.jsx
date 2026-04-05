@@ -128,8 +128,8 @@ export default function StepCareer() {
       <div className="career-grid">
         {Object.entries(careersData).map(([id, c]) => {
           const gb = state.gradBenefits
-          const isAutoQual   = !gb.usedQualDm && gb.autoQual === id
-          const isEligibleDm = !gb.usedQualDm && gb.qualDm > 0 && gb.qualEligible?.includes(id)
+          const isAutoQual   = !gb.usedAutoQual && gb.autoQual === id
+          const isEligibleDm = !gb.usedQualDm && gb.qualDm > 0 && gb.qualEligible?.includes(id)  // 대학교 DM 별도
           return (
             <div
               key={id}
@@ -298,7 +298,7 @@ export default function StepCareer() {
         const gradDm  = (!gb.usedQualDm && gb.qualDm > 0 && isEligible && !isLinkedCareer) ? gb.qualDm : 0
         const eventDm = state._nextQualDm ?? 0
         const qualDm  = gradDm + eventDm
-        const autoQualThisTerm = !gb.usedQualDm && isLinkedCareer && gb.autoQual
+        const autoQualThisTerm = !gb.usedAutoQual && isLinkedCareer && gb.autoQual
 
         return (
           <div className="card mt-md">
@@ -317,6 +317,7 @@ export default function StepCareer() {
                   <button className="btn btn-primary" onClick={() => {
                     setQualResult({ total: '자동', success: true })
                     actions.resolveQualRoll(true)
+                    actions.markGradBenefitUsed('autoQual')
                   }}>
                     자동 입대 →
                   </button>
@@ -368,6 +369,30 @@ export default function StepCareer() {
           </div>
         )
       })()}
+
+      {/* 경력 전교육 재진입 (3주기 미만) */}
+      {prevCareerCount < 3 && prevCareerCount > 0 && !state.preCareerSuccess && (
+        <div style={{
+          marginTop:'1rem', padding:'0.75rem 1rem',
+          background:'rgba(78,205,196,0.05)',
+          border:'1px solid rgba(78,205,196,0.25)',
+          borderRadius:'var(--radius-md)',
+          display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'0.5rem',
+        }}>
+          <div>
+            <div style={{fontSize:'0.82rem',color:'var(--col-cyan)',fontWeight:500,marginBottom:'2px'}}>
+              경력 전 교육 기회
+            </div>
+            <div style={{fontSize:'0.72rem',color:'var(--col-text-muted)'}}>
+              아직 {3 - prevCareerCount}번의 주기를 남겨두고 대학교나 사관학교에 입학할 수 있습니다.
+            </div>
+          </div>
+          <button className="btn btn-ghost" style={{borderColor:'var(--col-cyan)',color:'var(--col-cyan)'}}
+            onClick={actions.goPreCareer}>
+            경력 전 교육 받기
+          </button>
+        </div>
+      )}
 
       {/* 은퇴 옵션 (1주기 이상) */}
       {prevCareerCount >= 1 && (

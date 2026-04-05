@@ -173,10 +173,11 @@ export default function StepTerm() {
           {(() => {
             const gb = state.gradBenefits
             const isMilitaryCareer = ['army','navy','marine'].includes(state.currentCareer)
-            // 졸업 후 첫 군 경력인지: 이전 주기 중 군 경력이 없어야 함
-            const hasHadMilitary = state.careers.some(c => ['army','navy','marine'].includes(c.careerId))
+            // 졸업 후 첫 군 경력인지:
+            // 현재 경력이 군 경력이고, 이미 장교가 아니고, 임관 혜택 미사용
+            // (같은 경력 2주기 임관 재도전 허용 — 지위 8+ 조건은 별도 체크)
             const isFirstGradMilitary = gb.canCommission && !gb.usedCommission
-              && isMilitaryCareer && !hasHadMilitary
+              && isMilitaryCareer && !state.currentIsOfficer
             const commDm = isFirstGradMilitary ? (gb.commissionDm === 99 ? 0 : gb.commissionDm) : 0
             const autoComm = isFirstGradMilitary && (gb.autoCommission || gb.commissionDm === 99)
             // 임관 DM: 첫 주기가 아니면 -1 (지위 8+인 경우)
@@ -461,7 +462,29 @@ export default function StepTerm() {
               </p>
               {results.advancement.success && (
                 <div style={{marginBottom:'0.75rem'}}>
-                  <div style={{fontFamily:'var(--font-mono)',fontSize:'0.68rem',color:'var(--col-gold)',marginBottom:'0.5rem'}}>
+                  {/* 직급 보너스 기능 표시 */}
+                  {(() => {
+                    const rankList = state.currentIsOfficer
+                      ? (career?.ranks?.officer ?? [])
+                      : (career?.ranks?.[state.currentSpecialty] ?? career?.ranks?.enlisted ?? career?.ranks?.all ?? [])
+                    const rankEntry = rankList.find(r => r.rank === results.newRank)
+                    const bonus = rankEntry?.bonus
+                    if (!bonus || bonus === null) return null
+                    return (
+                      <div style={{padding:'0.5rem 0.75rem',marginBottom:'0.75rem',background:'rgba(200,168,75,0.07)',border:'1px solid var(--col-gold-dim)',borderRadius:'var(--radius-md)'}}>
+                        <div style={{fontFamily:'var(--font-mono)',fontSize:'0.65rem',color:'var(--col-gold)',marginBottom:'3px'}}>
+                          ✦ {state.currentIsOfficer ? '계급' : '직급'} {results.newRank} 혜택
+                        </div>
+                        <div style={{fontSize:'0.82rem',color:'var(--col-text)'}}>
+                          {bonus}
+                        </div>
+                        <div style={{fontSize:'0.72rem',color:'var(--col-text-muted)',marginTop:'2px'}}>
+                          (자동으로 기능/특성치에 적용됩니다)
+                        </div>
+                      </div>
+                    )
+                  })()}
+                  <div style={{fontFamily:'var(--font-mono)',fontSize:'0.68rem',color:'var(--col-cyan)',marginBottom:'0.5rem'}}>
                     ✦ 진급 보너스 — 기능 표 추가 굴림 1회
                   </div>
                   <SkillTrainingPanel

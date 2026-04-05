@@ -53,7 +53,8 @@ export const INITIAL_STATE = {
     autoCommission: false,  // 임관 자동 성공
     canCommission: false,   // 대학교 졸업 후 임관 시도 가능 여부
     autoQual: null,         // 자격 자동 성공 경력 id (사관학교 연계)
-    usedQualDm: false,      // 자격 DM 이미 사용했는지
+    usedQualDm: false,      // 대학교 자격 DM 사용했는지
+    usedAutoQual: false,    // 사관학교 자동성공 사용했는지
     usedCommission: false,  // 임관 혜택 이미 사용했는지
   },
 
@@ -142,6 +143,7 @@ export const A = {
   CONFIRM_BACKGROUND:  'CONFIRM_BACKGROUND',
 
   // Step 3: 경력 전 교육
+  GO_PRE_CAREER:       'GO_PRE_CAREER',   // 경력 전교육 재진입
   SKIP_PRE_CAREER:     'SKIP_PRE_CAREER',
   SELECT_PRE_CAREER:   'SELECT_PRE_CAREER',
   RESOLVE_PRE_CAREER:  'RESOLVE_PRE_CAREER', // { success, skills }
@@ -251,6 +253,17 @@ export function characterReducer(state, action) {
     }
 
     // ── Step 3: 경력 전 교육 ──────────────────────────────────
+    case A.GO_PRE_CAREER: {
+      // 경력 전교육 재진입 (3주기 미만만 가능)
+      if (state.careers.length >= 3) return state
+      return {
+        ...state,
+        preCareer: null,       // 선택 초기화
+        preCareerSuccess: null,
+        step: STEPS.PRE_CAREER,
+      }
+    }
+
     case A.SKIP_PRE_CAREER: {
       return { ...state, preCareer: null, step: STEPS.CAREER }
     }
@@ -403,6 +416,7 @@ export function characterReducer(state, action) {
         gradBenefits: {
           ...state.gradBenefits,
           usedQualDm:     field === 'qualDm'     ? true : state.gradBenefits.usedQualDm,
+          usedAutoQual:   field === 'autoQual'   ? true : state.gradBenefits.usedAutoQual,
           usedCommission: field === 'commission'  ? true : state.gradBenefits.usedCommission,
         }
       }

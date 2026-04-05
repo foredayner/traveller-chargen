@@ -98,6 +98,10 @@ export function useCharacter() {
     dispatch({ type: A.SKIP_PRE_CAREER })
   }, [])
 
+  const goPreCareer = useCallback(() => {
+    dispatch({ type: A.GO_PRE_CAREER })
+  }, [])
+
   const selectPreCareer = useCallback((preCareer) => {
     dispatch({ type: A.SELECT_PRE_CAREER, preCareer })
   }, [])
@@ -285,6 +289,7 @@ export function useCharacter() {
       confirmBackground,
       // Step 3
       skipPreCareer,
+      goPreCareer,
       selectPreCareer,
       resolvePreCareer,
       // Step 4
