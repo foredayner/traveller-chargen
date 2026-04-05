@@ -332,6 +332,17 @@ export default function StepCareer() {
                   </button>
                 </div>
               ) : career.qualification.stat ? (
+                <div>
+                  {gradDm > 0 && (
+                    <div style={{padding:'0.4rem 0.6rem',marginBottom:'0.5rem',background:'rgba(200,168,75,0.07)',border:'1px solid var(--col-gold-dim)',borderRadius:'var(--radius-sm)',fontSize:'0.75rem',color:'var(--col-gold)'}}>
+                      ★ 대학교 졸업 — 자격 판정 +{gradDm}
+                    </div>
+                  )}
+                  {eventDm > 0 && (
+                    <div style={{padding:'0.4rem 0.6rem',marginBottom:'0.5rem',background:'rgba(78,205,196,0.07)',border:'1px solid rgba(78,205,196,0.3)',borderRadius:'var(--radius-sm)',fontSize:'0.75rem',color:'var(--col-cyan)'}}>
+                      ★ 사건 보너스 — 자격 판정 +{eventDm}
+                    </div>
+                  )}
                 <DiceRollInline
                   label={`자격 굴림 — ${career.qualification.stat.toUpperCase()} ${career.qualification.target}+${
                     prevCareerCount > 0 ? ` (경력 DM ${-prevCareerCount})` : ''}${
@@ -350,6 +361,7 @@ export default function StepCareer() {
                     if (eventDm > 0) actions.clearNextQualDm()
                   }}
                 />
+                </div>
               ) : (
                 <button className="btn btn-primary" onClick={() => {
                   setQualResult({ total: null, success: true })

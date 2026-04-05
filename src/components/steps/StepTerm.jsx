@@ -277,7 +277,6 @@ export default function StepTerm() {
                 const r = { roll: values[0]+values[1], mod: statModifier(state.stats[specialty?.survival.stat??'end']??0), total, success }
                 setResults(rv => ({ ...rv, survival: r }))
                 actions.resolveSurvival(success)
-                setTimeout(() => setSub(success ? SUB.EVENT : SUB.MISHAP), 900)
               }}
             />
           ) : (
@@ -312,7 +311,7 @@ export default function StepTerm() {
                 const mishapRoll = values[0]
                 const mishapTable = careerEvents?.[state.currentCareer]?.mishaps ?? {}
                 const mishapData = mishapTable[String(mishapRoll)] ?? { text: '부상을 입습니다.', effects: [{ type: 'injury' }] }
-                setTimeout(() => setResults(r => ({ ...r, mishap: { roll: mishapRoll, data: mishapData } })), 600)
+                setResults(r => ({ ...r, mishap: { roll: mishapRoll, data: mishapData } }))
               }}
             />
           ) : (
@@ -338,16 +337,18 @@ export default function StepTerm() {
                 eventData={results.mishap.data}
                 isMishap={true}
                 onResolved={(log) => {
-                  // 불명예 제대: 소득 없이 경력 종료
                   const isDishonorable = log?.some(l => l.tag === '제대' && l.kind === 'loss')
-                  // 명예 제대: 소득 유지하며 경력 종료
                   const isHonorable = log?.some(l => l.tag === '제대' && l.kind === 'neutral')
-                  // 경력 종료 여부
                   const endCareer = !log?.some(l => l.tag === '사고' && l.text?.includes('경력 유지'))
                   actions.resolveMishap([], endCareer)
-                  setSub(SUB.END)
+                  setResults(rv => ({ ...rv, mishapResolved: true }))
                 }}
               />
+              {results.mishapResolved && (
+                <button className="btn btn-primary" style={{marginTop:'0.75rem'}} onClick={() => setSub(SUB.END)}>
+                  다음 — 주기 종료 →
+                </button>
+              )}
             </>
           )}
         </div>
@@ -368,7 +369,7 @@ export default function StepTerm() {
                 const d1 = values[0], d2 = values[1]
                 const evTable = careerEvents?.[state.currentCareer]?.events ?? {}
                 const eventData = evTable[String(total)] ?? { text: '생활 사건이 발생합니다.', effects: [{ type: 'life_event' }] }
-                setTimeout(() => setResults(r => ({ ...r, event: { d1, d2, total, data: eventData } })), 600)
+                setResults(r => ({ ...r, event: { d1, d2, total, data: eventData } }))
               }}
             />
           ) : (
@@ -394,20 +395,36 @@ export default function StepTerm() {
                 eventData={results.event.data}
                 isMishap={false}
                 onResolved={(log) => {
-                  // auto_advance 감지 → 진급 처리 후 노화/종료
                   const hasAutoAdvance = log?.some(l => l.tag === '진급')
                   if (hasAutoAdvance) {
                     const newRank = Math.min(6, (state.currentRank ?? 0) + 1)
                     actions.resolveAdvancement(true, newRank)
                     applyRankBonus(newRank)
-                    setResults(rv => ({ ...rv, advancement: { success: true, total: '자동', roll: 0, mod: 0 }, newRank }))
-                    setSub(needAging ? SUB.AGING : SUB.END)
+                    setResults(rv => ({ ...rv, advancement: { success: true, total: '자동', roll: 0, mod: 0 }, newRank, eventResolved: true, autoAdvance: true }))
                   } else {
-                    // 일반 사건 → 반드시 진급 굴림으로
-                    setSub(SUB.ADVANCEMENT)
+                    setResults(rv => ({ ...rv, eventResolved: true, autoAdvance: false }))
                   }
                 }}
               />
+              {/* 사건 해결 후 다음 버튼 */}
+              {results.eventResolved && (
+                <div style={{marginTop:'0.75rem'}}>
+                  {results.autoAdvance ? (
+                    <div>
+                      <p style={{fontSize:'0.82rem',color:'var(--col-green)',marginBottom:'0.5rem'}}>
+                        ✦ 사건으로 자동 진급!
+                      </p>
+                      <button className="btn btn-primary" onClick={() => setSub(needAging ? SUB.AGING : SUB.END)}>
+                        다음 — {needAging ? '노화 굴림' : '주기 종료'} →
+                      </button>
+                    </div>
+                  ) : (
+                    <button className="btn btn-primary" onClick={() => setSub(SUB.ADVANCEMENT)}>
+                      다음 — 진급 굴림 →
+                    </button>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -456,7 +473,6 @@ export default function StepTerm() {
                 setResults(rv => ({ ...rv, advancement: adv, newRank }))
                 actions.resolveAdvancement(success, newRank)
                 if (success && newRank > 0) applyRankBonus(newRank)
-                setTimeout(() => setSub(needAging ? SUB.AGING : SUB.END), 900)
               }}
             />
           ) : (
@@ -539,7 +555,6 @@ export default function StepTerm() {
                 const res = { roll: values[0]+values[1], dm: derived.agingDm, total, entry: agingEntry }
                 setResults(rv => ({ ...rv, aging: res }))
                 actions.resolveAging(agingEntry.effects ?? [])
-                setTimeout(() => setSub(SUB.END), 900)
               }}
             />
           ) : (
@@ -745,7 +760,7 @@ function SkillTrainingPanel({ career, specialty, isFirstTerm, onDone }) {
                 const tbl = tables.find(t => t.key === tableChoice)
                 const idx = values[0] - 1
                 const raw = tbl?.skills[idx] ?? '생존'
-                setTimeout(() => setRollResult({ idx: values[0], raw, table: tbl?.label ?? '' }), 600)
+                setRollResult({ idx: values[0], raw, table: tbl?.label ?? '' })
               }}
             />
           )}

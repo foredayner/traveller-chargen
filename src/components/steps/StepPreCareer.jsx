@@ -178,10 +178,7 @@ export default function StepPreCareer() {
                   target={option.check.target}
                   onResult={({ values, total, success }) => {
                     const mod = sm(state.stats[option.check.stat]) - termCount
-                    setTimeout(() => {
-                      setEntryResult({ roll: values[0]+values[1], mod, total, success })
-                      afterEntry(success)
-                    }, 700)
+                    setEntryResult({ roll: values[0]+values[1], mod, total, success })
                   }}
                 />
               ) : (
@@ -195,6 +192,11 @@ export default function StepPreCareer() {
                   </div>
                   {!entryResult.success && (
                     <button className="btn btn-primary" onClick={actions.skipPreCareer}>경력 선택으로 →</button>
+                  )}
+                  {entryResult.success && (
+                    <button className="btn btn-primary" style={{marginTop:'0.5rem'}} onClick={() => afterEntry(true)}>
+                      다음 — {option.skillSelect ? '기능 선택' : '사건 굴림'} →
+                    </button>
                   )}
                 </>
               )}
@@ -263,9 +265,14 @@ export default function StepPreCareer() {
                       key={`precareer-event-${eventData.total}`}
                       eventData={eventData.data}
                       isMishap={false}
-                      onResolved={() => { setEventResolved(true); setPhase('grad') }}
+                      onResolved={() => { setEventResolved(true) }}
                     />
-                  ) : null}
+                  ) : (
+                    <button className="btn btn-primary" style={{marginTop:'0.75rem'}}
+                      onClick={() => setPhase('grad')}>
+                      다음 — 졸업 굴림 →
+                    </button>
+                  )}
                 </>
               )}
             </div>
@@ -285,7 +292,7 @@ export default function StepPreCareer() {
                   target={option.gradCheck.target}
                   onResult={({ values, total, success }) => {
                     const mod = sm(state.stats[option.gradCheck.stat])
-                    setTimeout(() => setGradResult({ roll: values[0]+values[1], mod, total, success }), 700)
+                    setGradResult({ roll: values[0]+values[1], mod, total, success })
                   }}
                 />
               ) : (
