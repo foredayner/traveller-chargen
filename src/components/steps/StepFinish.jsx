@@ -540,12 +540,22 @@ export default function StepFinish() {
   const totalRolls = derived.musterRolls
   const usedRolls  = (state.benefits?.length??0) + (state.cashRollsUsed??0)
   const remaining  = Math.max(0, totalRolls - usedRolls)
+  const pension    = derived.pension  // 월 연금 (Cr)
 
   return (
     <div>
       <div className="step-heading">
         <h2>여행자 완성</h2>
         <p>{sub==='muster'?`퇴직 소득을 정산합니다. 총 ${totalRolls}회 굴릴 수 있습니다.`:'캐릭터 시트를 확인하고 저장합니다.'}</p>
+        {pension > 0 && (
+          <div style={{marginTop:'0.5rem',padding:'0.5rem 0.75rem',background:'rgba(78,205,196,0.07)',border:'1px solid rgba(78,205,196,0.3)',borderRadius:'var(--radius-md)',fontSize:'0.82rem',color:'var(--col-cyan)',display:'inline-flex',alignItems:'center',gap:'0.5rem'}}>
+            <span style={{fontFamily:'var(--font-mono)',fontSize:'0.7rem'}}>연금</span>
+            <strong>Cr {pension.toLocaleString()} / 월</strong>
+            <span style={{fontSize:'0.72rem',color:'var(--col-text-muted)'}}>
+              (군/정찰 {state.careers.filter(c=>['army','navy','marine','scout'].includes(c.careerId)).length}주기)
+            </span>
+          </div>
+        )}
       </div>
       <div style={{display:'flex',gap:'0.5rem',marginBottom:'1.5rem'}}>
         {[{key:'muster',label:'퇴직 소득',en:'MUSTERING OUT'},{key:'sheet',label:'캐릭터 시트',en:'CHARACTER SHEET'}].map(({key,label,en})=>(

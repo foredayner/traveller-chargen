@@ -409,28 +409,37 @@ export default function StepTerm() {
             진급 굴림 — {STAT_KO[specialty?.advancement?.stat ?? 'edu']} {specialty?.advancement?.target}+
             <span className="card-title-en">ADVANCEMENT</span>
           </div>
-          <p className="text-muted" style={{ fontSize:'0.82rem', marginBottom:'1rem' }}>
-            현재 {STAT_KO[specialty?.advancement?.stat ?? 'edu']}:{' '}
-            <strong style={{ color:'var(--col-cyan)', fontFamily:'var(--font-mono)' }}>
-              {state.stats[specialty?.advancement?.stat ?? 'edu'] ?? 0}
-            </strong>
-          </p>
+          {(() => {
+            const advDm = state._advancementDm ?? 0
+            const statDm = statModifier(state.stats[specialty?.advancement?.stat ?? 'edu'] ?? 0)
+            const totalMod = statDm + advDm
+            return (
+              <>
+                <p className="text-muted" style={{ fontSize:'0.82rem', marginBottom:'1rem' }}>
+                  현재 {STAT_KO[specialty?.advancement?.stat ?? 'edu']}:{' '}
+                  <strong style={{ color:'var(--col-cyan)', fontFamily:'var(--font-mono)' }}>
+                    {state.stats[specialty?.advancement?.stat ?? 'edu'] ?? 0}
+                  </strong>
+                  {advDm !== 0 && (
+                    <span style={{ color:'var(--col-gold)', marginLeft:'0.75rem', fontFamily:'var(--font-mono)', fontSize:'0.78rem' }}>
+                      ✦ 사건 보너스 DM {advDm > 0 ? '+' : ''}{advDm}
+                    </span>
+                  )}
+                </p>
           {!results.advancement ? (
             <DiceRollInline
-              label={`진급 굴림 — ${STAT_KO[specialty?.advancement?.stat ?? 'edu']} ${specialty?.advancement?.target}+`}
+              label={`진급 굴림 — ${STAT_KO[specialty?.advancement?.stat ?? 'edu']} ${specialty?.advancement?.target}+${advDm !== 0 ? ` (보너스 DM ${advDm > 0 ? '+' : ''}${advDm})` : ''}`}
               count={2}
-              mod={statModifier(state.stats[specialty?.advancement?.stat ?? 'edu'] ?? 0)}
+              mod={totalMod}
               target={specialty?.advancement?.target ?? 7}
               onResult={({ values, total, success }) => {
                 const rawRoll = values[0] + (values[1] ?? 0)
-                const newRank = success ? Math.min(6, Math.min(6, (state.currentRank ?? 0) + 1)) : state.currentRank ?? 0
-                // 룰북: 진급 결괏값(수정 전) <= 현재 주기 수 → 경력 강제 종료
-                // 진급 결괏값(수정 전) 12 → 경력 강제 유지
+                const newRank = success ? Math.min(6, (state.currentRank ?? 0) + 1) : state.currentRank ?? 0
                 const forcedEnd      = !success && rawRoll <= state.currentTerm
                 const forcedContinue = rawRoll === 12
                 const adv = {
                   roll: rawRoll,
-                  mod: statModifier(state.stats[specialty?.advancement?.stat??'edu']??0),
+                  mod: totalMod,
                   total, success, forcedEnd, forcedContinue
                 }
                 setResults(rv => ({ ...rv, advancement: adv, newRank }))
@@ -450,9 +459,30 @@ export default function StepTerm() {
                   return `진급! ${state.currentIsOfficer ? '계급' : '직급'} ${results.newRank}${rankEntry?.title && rankEntry.title !== '-' ? ` — ${rankEntry.title}` : ''}`
                 })() : '진급 없음'}
               </p>
-              <button className="btn btn-primary" onClick={() => setSub(needAging ? SUB.AGING : SUB.END)}>다음 →</button>
+              {results.advancement.success && (
+                <div style={{marginBottom:'0.75rem'}}>
+                  <div style={{fontFamily:'var(--font-mono)',fontSize:'0.68rem',color:'var(--col-gold)',marginBottom:'0.5rem'}}>
+                    ✦ 진급 보너스 — 기능 표 추가 굴림 1회
+                  </div>
+                  <SkillTrainingPanel
+                    career={career}
+                    specialty={specialty}
+                    isFirstTerm={false}
+                    onDone={(skillsGained) => {
+                      actions.resolveBasicTraining(skillsGained)
+                      setSub(needAging ? SUB.AGING : SUB.END)
+                    }}
+                  />
+                </div>
+              )}
+              {!results.advancement.success && (
+                <button className="btn btn-primary" onClick={() => setSub(needAging ? SUB.AGING : SUB.END)}>다음 →</button>
+              )}
             </>
           )}
+              </>
+            )
+          })()}
         </div>
       )}
 

@@ -53,6 +53,7 @@ export function useCharacter() {
     musterRolls:          selectors.musterRolls(state),
     sortedSkills:         selectors.sortedSkills(state),
     agingDm:              selectors.agingDm(state),
+    pension:              selectors.calcPension(state),
     isOfficerEligible:    state.currentIsOfficer ||
                           ['army', 'navy', 'marine'].includes(state.currentCareer),
   }), [state])
@@ -129,6 +130,14 @@ export function useCharacter() {
   // Step 5: 경력 주기
   const resolveBasicTraining = useCallback((skills) => {
     dispatch({ type: A.RESOLVE_BASIC_TRAINING, skills })
+  }, [])
+
+  const clearNextQualDm = useCallback(() => {
+    dispatch({ type: A.CLEAR_NEXT_QUAL_DM })
+  }, [])
+
+  const applyMedicalDebt = useCallback((amount) => {
+    dispatch({ type: A.APPLY_MEDICAL_DEBT, amount })
   }, [])
 
   const markGradBenefitUsed = useCallback((field) => {
@@ -288,6 +297,8 @@ export function useCharacter() {
       resolveBasicTraining,
       rollCommission,
       markGradBenefitUsed,
+      clearNextQualDm,
+      applyMedicalDebt,
       resolveSurvival,
       resolveEvent,
       resolveMishap,

@@ -73,7 +73,7 @@ export const INITIAL_STATE = {
       skillsGained: ['우주 비행(소형선)-1'],
       cashRolls: 1,
       benefitRolls: 1,
-      advancementDm: 0,      // 이번 주기 누적 진급 DM
+      _advancementDm: 0,     // 이번 주기 누적 진급 DM (사건 등으로 쌓임)
       nextTermPrisoner: false,
     }
   */
@@ -108,6 +108,7 @@ export const INITIAL_STATE = {
   cash: 0,
   benefits: [],           // ['함선 지분', '여행자 지원 협회 가입', ...]
   pension: 0,             // 월 연금 (Cr)
+  medicalDebt: 0,         // 의료 채무 (Cr)
 
   // 노화
   age: 18,
@@ -154,6 +155,8 @@ export const A = {
 
   // Step 5: 경력 주기
   RESOLVE_BASIC_TRAINING: 'RESOLVE_BASIC_TRAINING', // { skills }
+  CLEAR_NEXT_QUAL_DM:  'CLEAR_NEXT_QUAL_DM',
+  APPLY_MEDICAL_DEBT:  'APPLY_MEDICAL_DEBT',
   MARK_GRAD_BENEFIT_USED: 'MARK_GRAD_BENEFIT_USED',    // { roll, success }
   RESOLVE_SURVIVAL:    'RESOLVE_SURVIVAL',  // { roll, success }
   RESOLVE_EVENT:       'RESOLVE_EVENT',     // { roll, choice?, effects[] }
@@ -381,6 +384,18 @@ export function characterReducer(state, action) {
       return { ...state, skills }
     }
 
+    case A.CLEAR_NEXT_QUAL_DM:
+      return { ...state, _nextQualDm: 0 }
+
+    case A.APPLY_MEDICAL_DEBT: {
+      // 의료비: 1D×10,000 Cr. 현금으로 지불 가능하면 차감, 부족하면 채무
+      const cost = action.amount  // 컴포넌트에서 굴려서 넘김
+      const canPay = (state.cash ?? 0) >= cost
+      return canPay
+        ? { ...state, cash: state.cash - cost }
+        : { ...state, cash: 0, medicalDebt: (state.medicalDebt ?? 0) + cost - (state.cash ?? 0) }
+    }
+
     case A.MARK_GRAD_BENEFIT_USED: {
       const field = action.field  // 'qualDm' | 'commission'
       return {
@@ -584,7 +599,7 @@ function recordCurrentTerm(state, extra = {}) {
   // currentRank는 0으로 초기화하지 않고 유지
   // → 다음 주기에서 이번 주기 달성 rank를 기반으로 +1 진급
   // 단 다른 경력으로 전환(END_TERM_CHANGE)할 때는 0으로 초기화
-  return { ...state, careers: [...state.careers, termRecord] }
+  return { ...state, careers: [...state.careers, termRecord], _advancementDm: 0 }
 }
 
 /**
@@ -741,6 +756,17 @@ export const selectors = {
   },
 
   /** 소득 굴림 가능 횟수 (직급 보너스 포함) */
+  /** 연금 계산 (룰북 p.44: 군/정찰 5주기 이상) */
+  calcPension(state) {
+    // 연금 지급 대상 경력
+    const PENSION_CAREERS = ['army','navy','marine','scout']
+    const PENSION_TABLE = { 5:4000,6:6000,7:8000,8:10000,9:12000,10:14000,11:16000,12:18000 }
+    // 연금 대상 주기 수 (survived 여부 무관하게 해당 경력 주기는 카운트)
+    const pensionTerms = state.careers.filter(c => PENSION_CAREERS.includes(c.careerId)).length
+    if (pensionTerms < 5) return 0
+    return PENSION_TABLE[Math.min(12, pensionTerms)] ?? 18000
+  },
+
   musterRolls(state) {
     let total = 0
     for (const term of state.careers) {

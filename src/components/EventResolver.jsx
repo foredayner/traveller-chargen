@@ -869,6 +869,7 @@ function SpecialtyCheckEffect({ effect, state, actions, onDone }) {
 function InjuryEffect({ effect, state, actions, onDone }) {
   const [rollResult, setRollResult] = useState(null)
   const [subDone, setSubDone] = useState(false)
+  const [medDebt, setMedDebt] = useState(null)  // null=미처리, 숫자=의료비
 
   const isSevere = effect.severity === 'severe'
   const isHigh   = effect.severity === 'severe_high'  // 높은 값 선택
@@ -921,9 +922,38 @@ function InjuryEffect({ effect, state, actions, onDone }) {
           <div className="event-roll-label">부상 표 {rollResult.roll} — {entry.name}</div>
           <div className="event-text">{entry.text}</div>
         </div>
-        <button className="btn btn-primary"
-          onClick={() => onDone({ tag:'부상', text: entry.name, kind:'loss' })}
-        >확인</button>
+        {medDebt === null ? (
+          <button className="btn btn-primary"
+            onClick={() => setMedDebt(-1)}
+          >의료비 계산 →</button>
+        ) : medDebt === -1 ? (
+          <div>
+            <div style={{fontFamily:'var(--font-mono)',fontSize:'0.72rem',color:'var(--col-amber)',marginBottom:'0.5rem'}}>
+              ⚕ 의료 채무 — 1D × Cr10,000
+            </div>
+            <DiceRollInline
+              label="의료비 굴림 — 1D"
+              count={1} sides={6} mod={0}
+              onResult={({ values }) => {
+                const cost = values[0] * 10000
+                setMedDebt(cost)
+                actions.applyMedicalDebt?.(cost)
+              }}
+            />
+          </div>
+        ) : (
+          <div>
+            <p style={{fontSize:'0.82rem',color:'var(--col-amber)',marginBottom:'0.75rem'}}>
+              의료비 Cr {medDebt.toLocaleString()} —{' '}
+              {(state.cash ?? 0) + medDebt >= medDebt
+                ? '현금으로 지불됩니다.'
+                : `현금 부족. 채무 Cr ${(medDebt - Math.min(state.cash ?? 0, medDebt)).toLocaleString()} 발생.`}
+            </p>
+            <button className="btn btn-primary"
+              onClick={() => onDone({ tag:'부상', text: entry.name, kind:'loss' })}
+            >확인</button>
+          </div>
+        )}
       </div>
     )
   }

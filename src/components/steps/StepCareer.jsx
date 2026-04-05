@@ -294,77 +294,78 @@ export default function StepCareer() {
       {currentCareer && currentSpecialty && (() => {
         const gb = state.gradBenefits
         const isLinkedCareer = gb.autoQual === currentCareer
-        // 자격 DM: 대학교 졸업 혜택 경력인지 + 아직 미사용
         const isEligible = gb.qualEligible?.includes(currentCareer)
-        const qualDm = (!gb.usedQualDm && gb.qualDm > 0 && isEligible && !isLinkedCareer) ? gb.qualDm : 0
+        const gradDm  = (!gb.usedQualDm && gb.qualDm > 0 && isEligible && !isLinkedCareer) ? gb.qualDm : 0
+        const eventDm = state._nextQualDm ?? 0
+        const qualDm  = gradDm + eventDm
         const autoQualThisTerm = !gb.usedQualDm && isLinkedCareer && gb.autoQual
 
         return (
-        <div className="card mt-md">
-          <div className="card-title">
-            자격 굴림
-            {qualDm > 0 && <span style={{marginLeft:'0.5rem',color:'var(--col-gold)',fontSize:'0.72rem',fontFamily:'var(--font-mono)'}}>졸업 혜택 DM +{qualDm}</span>}
-            {autoQualThisTerm && <span style={{marginLeft:'0.5rem',color:'var(--col-green)',fontSize:'0.72rem',fontFamily:'var(--font-mono)'}}>✓ 졸업 혜택: 자격 자동 성공</span>}
-          </div>
-          {!qualResult ? (
-            autoQualThisTerm ? (
-              // 사관학교 연계 경력: 자격 자동 성공
-              <div>
-                <p style={{fontSize:'0.82rem',color:'var(--col-green)',marginBottom:'0.75rem'}}>
-                  사관학교 졸업 혜택으로 {careersData[currentCareer]?.name} 경력 자격이 자동으로 성공합니다.
-                </p>
+          <div className="card mt-md">
+            <div className="card-title">
+              자격 굴림
+              {gradDm > 0 && <span style={{marginLeft:'0.5rem',color:'var(--col-gold)',fontSize:'0.72rem',fontFamily:'var(--font-mono)'}}>졸업 혜택 DM +{gradDm}</span>}
+              {eventDm > 0 && <span style={{marginLeft:'0.5rem',color:'var(--col-cyan)',fontSize:'0.72rem',fontFamily:'var(--font-mono)'}}>사건 DM +{eventDm}</span>}
+              {autoQualThisTerm && <span style={{marginLeft:'0.5rem',color:'var(--col-green)',fontSize:'0.72rem',fontFamily:'var(--font-mono)'}}>✓ 자격 자동 성공 (사관학교)</span>}
+            </div>
+            {!qualResult ? (
+              autoQualThisTerm ? (
+                <div>
+                  <p style={{fontSize:'0.82rem',color:'var(--col-green)',marginBottom:'0.75rem'}}>
+                    사관학교 졸업 혜택으로 {careersData[currentCareer]?.name} 경력 자격이 자동으로 성공합니다.
+                  </p>
+                  <button className="btn btn-primary" onClick={() => {
+                    setQualResult({ total: '자동', success: true })
+                    actions.resolveQualRoll(true)
+                  }}>
+                    자동 입대 →
+                  </button>
+                </div>
+              ) : career.qualification.stat ? (
+                <DiceRollInline
+                  label={`자격 굴림 — ${career.qualification.stat.toUpperCase()} ${career.qualification.target}+${
+                    prevCareerCount > 0 ? ` (경력 DM ${-prevCareerCount})` : ''}${
+                    qualDm > 0 ? ` (보너스 DM +${qualDm})` : ''}`}
+                  count={2}
+                  mod={statModifier(state.stats[
+                    career.qualification.stat === 'dex_or_int'
+                      ? (state.stats.dex >= state.stats.int ? 'dex' : 'int')
+                      : career.qualification.stat
+                  ] ?? 0) - prevCareerCount + qualDm}
+                  target={career.qualification.target}
+                  onResult={({ values, total, success }) => {
+                    setQualResult({ total, success })
+                    actions.resolveQualRoll(success)
+                    if (gradDm > 0) actions.markGradBenefitUsed('qualDm')
+                    if (eventDm > 0) actions.clearNextQualDm()
+                  }}
+                />
+              ) : (
                 <button className="btn btn-primary" onClick={() => {
-                  setQualResult({ total: '자동', success: true })
+                  setQualResult({ total: null, success: true })
                   actions.resolveQualRoll(true)
-                  // usedQualDm 플래그 — 별도 action 또는 여기서 처리
                 }}>
-                  자동 입대 →
+                  자동 성공 — 시작
                 </button>
-              </div>
-            ) : career.qualification.stat ? (
-              <DiceRollInline
-                label={`자격 굴림 — ${career.qualification.stat.toUpperCase()} ${career.qualification.target}+${
-                  prevCareerCount > 0 ? ` (경력 DM ${-prevCareerCount})` : ''}${
-                  qualDm > 0 ? ` (졸업 DM +${qualDm})` : ''}`}
-                count={2}
-                mod={statModifier(state.stats[
-                  career.qualification.stat === 'dex_or_int'
-                    ? (state.stats.dex >= state.stats.int ? 'dex' : 'int')
-                    : career.qualification.stat
-                ] ?? 0) - prevCareerCount + qualDm}
-                target={career.qualification.target}
-                onResult={({ values, total, success }) => {
-                  setQualResult({ total, success })
-                  actions.resolveQualRoll(success)
-                  if (qualDm > 0) actions.markGradBenefitUsed('qualDm')
-                }}
-              />
+              )
             ) : (
-              <button className="btn btn-primary" onClick={() => {
-                setQualResult({ total: null, success: true })
-                actions.resolveQualRoll(true)
-              }}>
-                자동 성공 — 시작
-              </button>
-            )
-          ) : (
-            <>
-              <div className={`roll-result ${qualResult.success ? 'success' : 'failure'}`}>
-                <div className={`roll-total ${qualResult.success ? 'success' : 'failure'}`}>
-                  {qualResult.total ?? '자동'}
+              <>
+                <div className={`roll-result ${qualResult.success ? 'success' : 'failure'}`}>
+                  <div className={`roll-total ${qualResult.success ? 'success' : 'failure'}`}>
+                    {qualResult.total ?? '자동'}
+                  </div>
+                  <div className="roll-detail">
+                    {qualResult.success ? '입대 성공!' : '입대 실패 — 징병 또는 방랑자 선택'}
+                  </div>
                 </div>
-                <div className="roll-detail">
-                  {qualResult.success ? '입대 성공!' : '입대 실패 — 징병 또는 방랑자 선택'}
-                </div>
-              </div>
-              {qualResult.success && (
-                <button className="btn btn-primary mt-md" onClick={actions.startTerm}>
-                  다음 — 경력 주기 시작 →
-                </button>
-              )}
-            </>
-          )}
-        </div>
+                {qualResult.success && (
+                  <button className="btn btn-primary mt-md" onClick={actions.startTerm}>
+                    다음 — 경력 주기 시작 →
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         )
       })()}
 

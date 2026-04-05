@@ -106,7 +106,9 @@ export default function StepPreCareer() {
   const handleConfirm = () => {
     const honors = (gradResult?.total ?? 0) >= 10
     const skillsGained = []
-    actions.resolvePreCareer(gradResult?.success ?? false, skillsGained, honors, entryResult?.total ?? 12)
+    // 룰북: 사관학교 졸업 실패 시 입학 결괏값(수정 전 raw) 2 이하면 자동 입대 불가
+    const entryRaw = entryResult?.roll ?? 12
+    actions.resolvePreCareer(gradResult?.success ?? false, skillsGained, honors, entryRaw)
   }
 
   if (!canEnroll) {
