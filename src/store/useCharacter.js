@@ -106,8 +106,8 @@ export function useCharacter() {
     dispatch({ type: A.SELECT_PRE_CAREER, preCareer })
   }, [])
 
-  const resolvePreCareer = useCallback((success, skills = [], honors = false, entryRoll = 12) => {
-    dispatch({ type: A.RESOLVE_PRE_CAREER, success, skills, honors, entryRoll })
+  const resolvePreCareer = useCallback((success, skills = [], honors = false, entryRoll = 12, institution = null) => {
+    dispatch({ type: A.RESOLVE_PRE_CAREER, success, skills, honors, entryRoll, institution })
   }, [])
 
   // Step 4: 경력 선택

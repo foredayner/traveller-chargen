@@ -306,14 +306,23 @@ export default function StepCareer() {
               자격 굴림
               {gradDm > 0 && <span style={{marginLeft:'0.5rem',color:'var(--col-gold)',fontSize:'0.72rem',fontFamily:'var(--font-mono)'}}>졸업 혜택 DM +{gradDm}</span>}
               {eventDm > 0 && <span style={{marginLeft:'0.5rem',color:'var(--col-cyan)',fontSize:'0.72rem',fontFamily:'var(--font-mono)'}}>사건 DM +{eventDm}</span>}
-              {autoQualThisTerm && <span style={{marginLeft:'0.5rem',color:'var(--col-green)',fontSize:'0.72rem',fontFamily:'var(--font-mono)'}}>✓ 자격 자동 성공 (사관학교)</span>}
+              {autoQualThisTerm && (() => {
+              const schoolNames = { army_academy:'육군사관학교', marine_academy:'해병사관학교', navy_academy:'해군사관학교' }
+              return <span style={{marginLeft:'0.5rem',color:'var(--col-green)',fontSize:'0.72rem',fontFamily:'var(--font-mono)'}}>✓ 자격 자동 성공 ({schoolNames[state.preCareer] ?? '사관학교'} 졸업)</span>
+            })()}
             </div>
             {!qualResult ? (
               autoQualThisTerm ? (
                 <div>
-                  <p style={{fontSize:'0.82rem',color:'var(--col-green)',marginBottom:'0.75rem'}}>
-                    사관학교 졸업 혜택으로 {careersData[currentCareer]?.name} 경력 자격이 자동으로 성공합니다.
+                  <p style={{fontSize:'0.82rem',color:'var(--col-green)',marginBottom:'0.5rem'}}>
+                    ✓ 자격 자동 성공
                   </p>
+                  <div style={{padding:'0.5rem 0.75rem',background:'rgba(78,205,196,0.07)',border:'1px solid rgba(78,205,196,0.25)',borderRadius:'var(--radius-md)',fontSize:'0.78rem',color:'var(--col-text)',marginBottom:'0.75rem'}}>
+                    {(() => {
+                      const schoolNames = { army_academy:'육군사관학교', marine_academy:'해병사관학교', navy_academy:'해군사관학교' }
+                      return <><strong style={{color:'var(--col-cyan)'}}>{schoolNames[state.preCareer] ?? '사관학교'} 졸업</strong> — {careersData[currentCareer]?.name} 경력 자격 굴림이 자동으로 성공합니다.</>
+                    })()}
+                  </div>
                   <button className="btn btn-primary" onClick={() => {
                     setQualResult({ total: '자동', success: true })
                     actions.resolveQualRoll(true)

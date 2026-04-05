@@ -273,7 +273,10 @@ export function characterReducer(state, action) {
     }
 
     case A.RESOLVE_PRE_CAREER: {
-      const { success, honors = false, skills: newSkills = [] } = action
+      const { success, honors = false, skills: newSkills = [], institution } = action
+      // institution: 'university' | 'army_academy' | 'marine_academy' | 'navy_academy'
+      // state.preCareer는 SELECT_PRE_CAREER 없이 null일 수 있으므로 action.institution 우선
+      const preCareer = institution ?? state.preCareer
       let skills = { ...state.skills }
       for (const { skill, level } of newSkills) {
         skills[skill] = Math.max(skills[skill] ?? -1, level)
@@ -286,7 +289,7 @@ export function characterReducer(state, action) {
         marine_academy: 'marine',
         navy_academy:   'navy',
       }
-      const linkedCareer = academyCareerMap[state.preCareer] ?? null
+      const linkedCareer = academyCareerMap[preCareer] ?? null
 
       let gradBenefits = { ...state.gradBenefits }
 
@@ -337,6 +340,7 @@ export function characterReducer(state, action) {
 
       return {
         ...state,
+        preCareer,             // 선택한 교육 기관 저장
         preCareerSuccess: success,
         preCareerHonors: honors,
         gradBenefits,

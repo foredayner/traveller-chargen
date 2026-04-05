@@ -187,10 +187,20 @@ export default function StepTerm() {
               <>
                 <p className="text-muted" style={{ fontSize:'0.82rem', marginBottom:'1rem' }}>
                   {isFirstTerm ? '첫 주기 임관 시도.' : '지위 8+ 임관 시도 (비첫주기 -1).'}
-                  {autoComm && <span style={{color:'var(--col-gold)'}}> 사관학교 우등 졸업: 자동 성공!</span>}
-                  {commDm > 0 && !autoComm && <span style={{color:'var(--col-gold)'}}> 졸업 혜택 DM +{commDm}</span>}
-                  {notFirstDm < 0 && <span style={{color:'var(--col-amber)'}}> 비첫주기 DM {notFirstDm}</span>}
                   {' '}현재 지위: <strong style={{color:'var(--col-cyan)',fontFamily:'var(--font-mono)'}}>{state.stats.soc ?? 0}</strong>
+                  {(autoComm || commDm > 0) && (() => {
+                    const schoolNames = { army_academy:'육군사관학교', marine_academy:'해병사관학교', navy_academy:'해군사관학교', university:'대학교' }
+                    const schoolName = schoolNames[state.preCareer] ?? '졸업'
+                    const honorsStr = state.preCareerHonors ? ' 우등' : ''
+                    return (
+                      <div style={{marginTop:'0.4rem',padding:'0.4rem 0.6rem',background:'rgba(200,168,75,0.07)',border:'1px solid var(--col-gold-dim)',borderRadius:'var(--radius-sm)',fontSize:'0.75rem',color:'var(--col-gold)'}}>
+                        {autoComm
+                          ? `★ ${schoolName}${honorsStr} 졸업 — 임관 자동 성공`
+                          : `★ ${schoolName}${honorsStr} 졸업 — 임관 판정 +${commDm}`}
+                      </div>
+                    )
+                  })()}
+                  {notFirstDm < 0 && <div style={{marginTop:'3px',fontSize:'0.72rem',color:'var(--col-amber)'}}>비첫주기 DM {notFirstDm}</div>}
                 </p>
                 {!results.commission ? (
                   <div style={{ display:'flex', flexDirection:'column', gap:'0.75rem' }}>
@@ -422,9 +432,9 @@ export default function StepTerm() {
                     {state.stats[specialty?.advancement?.stat ?? 'edu'] ?? 0}
                   </strong>
                   {advDm !== 0 && (
-                    <span style={{ color:'var(--col-gold)', marginLeft:'0.75rem', fontFamily:'var(--font-mono)', fontSize:'0.78rem' }}>
-                      ✦ 사건 보너스 DM {advDm > 0 ? '+' : ''}{advDm}
-                    </span>
+                    <div style={{marginTop:'0.4rem',padding:'0.4rem 0.6rem',display:'inline-block',background:'rgba(200,168,75,0.07)',border:'1px solid var(--col-gold-dim)',borderRadius:'var(--radius-sm)',fontSize:'0.75rem',color:'var(--col-gold)'}}>
+                      ★ 사건 보너스 — 진급 판정 {advDm > 0 ? '+' : ''}{advDm}
+                    </div>
                   )}
                 </p>
           {!results.advancement ? (
