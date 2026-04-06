@@ -209,6 +209,7 @@ function EffectHandler({ effect, state, actions, isMishap, onDone }) {
       return <AutoFlagEffect effect={effect} label="진급 DM" tag="진급" actions={actions} onDone={onDone}
         apply={() => actions.dispatch?.({ type: 'SET_ADVANCEMENT_DM', value: effect.value })} />
 
+    case 'keep_career':
     case 'next_qualification_dm':
     case 'muster_dm':
     case 'extra_muster_roll':
@@ -473,6 +474,7 @@ function AutoNarrativeEffect({ effect, state, actions, onDone }) {
   const narratives = {
     next_term_prisoner:       { tag:'경력', text:'다음 주기 죄수 경력으로 시작합니다.', kind:'loss' },
     next_term_draft:          { tag:'징병', text:'다음 주기 징병 굴림을 합니다.', kind:'neutral' },
+    keep_career:              { tag:'경력유지', text:'경력을 그만둘 필요가 없습니다.', kind:'neutral' },
     end_career:               { tag:'경력', text:'경력이 강제 종료됩니다.', kind:'loss' },
     end_career_no_muster:     { tag:'경력', text:'소득 없이 경력이 종료됩니다.', kind:'loss' },
     honorable_discharge:      { tag:'제대', text:'명예 제대. 이번 주기 소득을 유지합니다.', kind:'neutral' },

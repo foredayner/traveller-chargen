@@ -337,17 +337,28 @@ export default function StepTerm() {
                 eventData={results.mishap.data}
                 isMishap={true}
                 onResolved={(log) => {
-                  const isDishonorable = log?.some(l => l.tag === '제대' && l.kind === 'loss')
-                  const isHonorable = log?.some(l => l.tag === '제대' && l.kind === 'neutral')
-                  const endCareer = !log?.some(l => l.tag === '사고' && l.text?.includes('경력 유지'))
+                  // keep_career effect가 있으면 경력 유지
+                  const keepCareer = log?.some(l => l.tag === '경력유지')
+                  const endCareer = !keepCareer
                   actions.resolveMishap([], endCareer)
-                  setResults(rv => ({ ...rv, mishapResolved: true }))
+                  setResults(rv => ({ ...rv, mishapResolved: true, mishapKeptCareer: keepCareer }))
                 }}
               />
               {results.mishapResolved && (
-                <button className="btn btn-primary" style={{marginTop:'0.75rem'}} onClick={() => setSub(SUB.END)}>
-                  다음 — 주기 종료 →
-                </button>
+                results.mishapKeptCareer ? (
+                  <div style={{marginTop:'0.75rem'}}>
+                    <p style={{fontSize:'0.82rem',color:'var(--col-cyan)',marginBottom:'0.5rem'}}>
+                      ✓ 경력을 그만둘 필요가 없습니다. 주기를 계속합니다.
+                    </p>
+                    <button className="btn btn-primary" onClick={() => setSub(SUB.ADVANCEMENT)}>
+                      다음 — 진급 굴림 →
+                    </button>
+                  </div>
+                ) : (
+                  <button className="btn btn-primary" style={{marginTop:'0.75rem'}} onClick={() => setSub(SUB.END)}>
+                    다음 — 주기 종료 →
+                  </button>
+                )
               )}
             </>
           )}

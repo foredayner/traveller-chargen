@@ -2307,10 +2307,13 @@
         "text": "행성 정부에서 정치적이거나 종교적인 이유로 당신의 연구에 간섭합니다.",
         "effects": [
           {
+            "type": "keep_career"
+          },
+          {
             "type": "choice",
             "options": [
               {
-                "label": "공개 연구 계속 (학문 +1, 적수)",
+                "label": "공개적으로 연구 계속 (학문+1, 적수 획득)",
                 "effects": [
                   {
                     "type": "skill",
@@ -2323,7 +2326,7 @@
                 ]
               },
               {
-                "label": "비밀 연구 (학문 +1, 지위 -2)",
+                "label": "비밀리에 연구 계속 (학문+1, 지위-2)",
                 "effects": [
                   {
                     "type": "skill",
@@ -2361,16 +2364,22 @@
             "type": "choice",
             "options": [
               {
-                "label": "건질 것 건지고 포기 (소득 유지)",
+                "label": "건질 것 건지고 포기 (경력 종료, 이번 소득 유지)",
                 "effects": [
                   {
                     "type": "keep_muster"
+                  },
+                  {
+                    "type": "end_career"
                   }
                 ]
               },
               {
-                "label": "처음부터 다시 (경력 유지, 소득 포기)",
+                "label": "처음부터 다시 시작 (경력 유지, 모든 소득 포기)",
                 "effects": [
+                  {
+                    "type": "keep_career"
+                  },
                   {
                     "type": "lose_all_muster"
                   }
@@ -2383,6 +2392,9 @@
       "6": {
         "text": "경쟁 관계의 연구자가 당신에게 오명을 씌우거나 연구를 표절합니다.",
         "effects": [
+          {
+            "type": "keep_career"
+          },
           {
             "type": "rival"
           }
@@ -2609,13 +2621,17 @@
         "text": "동결 수송 이후 소생 과정에 문제가 생깁니다. 근손실이 생깁니다.",
         "effects": [
           {
+            "type": "keep_career"
+          },
+          {
             "type": "stat_choice",
-            "stats": [
+            "options": [
               "str",
               "dex",
               "end"
             ],
-            "value": -1
+            "value": -1,
+            "label": "근력/민첩/인내 중 하나 -1"
           }
         ]
       },
@@ -2902,11 +2918,18 @@
             "options": [
               {
                 "label": "거부 (불명예 제대)",
-                "effects": []
+                "effects": [
+                  {
+                    "type": "dishonorable_discharge"
+                  }
+                ]
               },
               {
-                "label": "수락 (해병 계속, 적수 획득)",
+                "label": "수락 (해병 경력 계속, 적수 획득)",
                 "effects": [
+                  {
+                    "type": "keep_career"
+                  },
                   {
                     "type": "enemy"
                   }
