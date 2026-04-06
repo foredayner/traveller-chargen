@@ -468,7 +468,8 @@ export function characterReducer(state, action) {
         next.currentSpecialty = null
         next.currentTerm = 1
         next.currentIsOfficer = false
-        next.currentRank = 0   // 사고 종료 시 초기화
+        next.currentRank = 0
+        next.age = next.age + 4  // 룰북: 사고로 제대해도 4년 경과
       }
       return next
     }

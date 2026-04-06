@@ -355,8 +355,9 @@ export default function StepTerm() {
                     </button>
                   </div>
                 ) : (
-                  <button className="btn btn-primary" style={{marginTop:'0.75rem'}} onClick={() => setSub(SUB.END)}>
-                    다음 — 주기 종료 →
+                  <button className="btn btn-primary" style={{marginTop:'0.75rem'}}
+                    onClick={() => setSub(needAging ? SUB.AGING : SUB.END)}>
+                    다음 — {needAging ? '노화 굴림 →' : '주기 종료 →'}
                   </button>
                 )
               )}

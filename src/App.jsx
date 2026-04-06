@@ -4,9 +4,13 @@
 //  Cinzel (라틴 세리프) + Noto Serif KR (한글) + Share Tech Mono (숫자)
 // ─────────────────────────────────────────────────────────────
 
+import { useState } from 'react'
 import { useCharacterContext } from './store/CharacterContext.jsx'
 import { STEPS } from './store/stepReducer.js'
 import SideSheet from './components/SideSheet.jsx'
+import AuthScreen from './components/AuthScreen.jsx'
+import CharacterSlotScreen from './components/CharacterSlotScreen.jsx'
+import { saveCharacter, loadCharacter } from './supabase.js'
 
 // Step 컴포넌트들 (각각 별도 파일)
 import StepStats      from './components/steps/StepStats.jsx'
@@ -27,6 +31,48 @@ const STEP_LABELS = [
 
 export default function App() {
   const { state, step, actions } = useCharacterContext()
+
+  // 인증 상태
+  const [user, setUser] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('traveller_user')) } catch { return null }
+  })
+  const [screen,  setScreen]  = useState('slots')
+  const [curSlot, setCurSlot] = useState(null)
+  const [saving,  setSaving]  = useState(false)
+  const [saveMsg, setSaveMsg] = useState('')
+
+  const handleLogin  = (u) => { setUser(u); setScreen('slots') }
+  const handleLogout = () => {
+    sessionStorage.removeItem('traveller_user')
+    setUser(null); setScreen('slots'); setCurSlot(null)
+  }
+  const handleSelectSlot = async ({ slot, mode }) => {
+    setCurSlot(slot)
+    if (mode === 'load') {
+      try {
+        const charState = await loadCharacter(user.key, slot)
+        actions.loadState(charState)
+      } catch (e) { alert(e.message); return }
+    } else {
+      actions.resetCharacter()
+    }
+    setScreen('game')
+  }
+  const handleSave = async () => {
+    if (!user || !curSlot) return
+    setSaving(true)
+    try {
+      await saveCharacter(user.key, curSlot, state)
+      setSaveMsg('저장됨 ✓')
+      setTimeout(() => setSaveMsg(''), 2500)
+    } catch (e) { setSaveMsg('저장 실패') }
+    finally { setSaving(false) }
+  }
+
+  if (!user) return <AuthScreen onLogin={handleLogin} />
+  if (screen === 'slots') return (
+    <CharacterSlotScreen user={user} onSelect={handleSelectSlot} onLogout={handleLogout} />
+  )
 
   return (
     <div className="app-shell">
@@ -62,18 +108,49 @@ export default function App() {
             </div>
           )}
 
-          {/* 리셋 버튼 */}
-          <button
-            className="btn-reset"
-            onClick={() => {
-              if (window.confirm('처음부터 다시 시작하시겠습니까?')) {
-                actions.resetCharacter()
-              }
-            }}
-            title="처음부터 다시 시작"
-          >
-            ↺ 리셋
-          </button>
+          {/* 우측 버튼 그룹 */}
+          <div style={{ display:'flex', alignItems:'center', gap:'0.5rem' }}>
+            {/* 저장 버튼 */}
+            {user && curSlot && (
+              <button
+                className="btn-reset"
+                onClick={handleSave}
+                disabled={saving}
+                title={`슬롯 ${curSlot}에 저장`}
+                style={{ color: saveMsg.includes('✓') ? 'var(--col-green)' : undefined }}
+              >
+                {saving ? '저장 중...' : saveMsg || `💾 저장`}
+              </button>
+            )}
+
+            {/* 슬롯 선택으로 */}
+            {user && (
+              <button
+                className="btn-reset"
+                onClick={() => {
+                  if (window.confirm('저장하지 않은 내용은 사라집니다. 캐릭터 목록으로 이동할까요?')) {
+                    setScreen('slots')
+                  }
+                }}
+                title="캐릭터 목록"
+              >
+                ← 목록
+              </button>
+            )}
+
+            {/* 리셋 버튼 */}
+            <button
+              className="btn-reset"
+              onClick={() => {
+                if (window.confirm('처음부터 다시 시작하시겠습니까?')) {
+                  actions.resetCharacter()
+                }
+              }}
+              title="처음부터 다시 시작"
+            >
+              ↺ 리셋
+            </button>
+          </div>
         </div>
       </header>
 
