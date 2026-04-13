@@ -148,6 +148,18 @@ export function useCharacter() {
     dispatch({ type: A.APPLY_MEDICAL_DEBT, amount })
   }, [])
 
+  const setStatAdjustment = useCallback((stat, value) => {
+    dispatch({ type: A.SET_STAT_ADJUSTMENT, stat, value })
+  }, [])
+
+  const setPortrait = useCallback((dataUrl) => {
+    dispatch({ type: A.SET_PORTRAIT, dataUrl })
+  }, [])
+
+  const setPsionic = useCallback((psionic) => {
+    dispatch({ type: A.SET_PSIONIC, psionic })
+  }, [])
+
   const markGradBenefitUsed = useCallback((field) => {
     dispatch({ type: A.MARK_GRAD_BENEFIT_USED, field })
   }, [])
@@ -309,6 +321,9 @@ export function useCharacter() {
       markGradBenefitUsed,
       clearNextQualDm,
       applyMedicalDebt,
+      setStatAdjustment,
+      setPortrait,
+      setPsionic,
       resolveSurvival,
       resolveEvent,
       resolveMishap,

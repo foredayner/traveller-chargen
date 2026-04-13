@@ -46,6 +46,15 @@ function CharacterSheetPanel({ state, actions, derived }) {
   const [augments,  setAugments]  = useState('')
   const [notes,     setNotes]     = useState('')
 
+  // ── 새 기능 상태 ───────────────────────────────────────────
+  const portrait      = state.portrait ?? null
+  const statAdj       = state.statAdjustments ?? {}
+  const baseStats     = state.baseStats ?? stats  // 초기값 없으면 현재값 사용
+  const psionic       = state.psionic ?? { strength: null, talents: [] }
+  const [psionicOpen, setPsionicOpen] = useState(false)
+  const [newTalentName,  setNewTalentName]  = useState('')
+  const [newTalentLevel, setNewTalentLevel] = useState(1)
+
   const specInfo = SPECIES_LIST.find(s => s.id === speciesId) ?? SPECIES_LIST[0]
   const uppStr   = STAT_KEYS.map(k => {
     const v = stats[k] ?? 0
@@ -85,23 +94,98 @@ function CharacterSheetPanel({ state, actions, derived }) {
         </div>
       </div>
 
-      {/* ── 특성치 ── */}
-      <div className="card" style={{marginBottom:'1rem'}}>
-        <div className="card-title">특성치 <span className="card-title-en">CHARACTERISTICS — UPP {uppStr}</span></div>
-        <div className="stat-grid">
-          {STAT_KEYS.map(k => {
-            const v = stats[k] ?? 0; const m = mod(v)
-            const sm = specInfo.mods?.[k] ?? 0
-            return (
-              <div key={k} className="stat-card">
-                <div className="stat-name">{STAT_EN[k]}</div>
-                <div className="stat-value">{v}</div>
-                <div className="stat-name" style={{marginTop:'2px'}}>{STAT_KO[k]}</div>
-                <div className={`stat-mod ${m>0?'pos':m<0?'neg':''}`}>DM {modStr(v)}</div>
-                {sm !== 0 && <div style={{fontSize:'0.55rem',color:sm>0?'var(--col-green)':'var(--col-red)',fontFamily:'var(--font-mono)'}}>종족 {sm>0?'+':''}{sm}</div>}
+      {/* ── 초상화 + 특성치 ── */}
+      <div style={{display:'grid', gridTemplateColumns:'140px 1fr', gap:'1rem', marginBottom:'1rem'}}>
+        {/* 초상화 */}
+        <div className="card" style={{padding:'0.75rem', display:'flex', flexDirection:'column', alignItems:'center', gap:'0.5rem'}}>
+          <div
+            style={{
+              width:'110px', height:'140px',
+              border:'1.5px solid var(--col-border)',
+              borderRadius:'var(--radius-md)',
+              overflow:'hidden',
+              background:'var(--col-deep)',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              cursor:'pointer', position:'relative',
+            }}
+            onClick={() => document.getElementById('portrait-upload').click()}
+            title="클릭하여 이미지 업로드"
+          >
+            {portrait ? (
+              <img src={portrait} alt="초상화" style={{width:'100%',height:'100%',objectFit:'cover'}} />
+            ) : (
+              <div style={{textAlign:'center',color:'var(--col-text-dim)',fontSize:'0.65rem',fontFamily:'var(--font-mono)'}}>
+                <div style={{fontSize:'1.5rem',marginBottom:'4px'}}>👤</div>
+                초상화 추가
               </div>
-            )
-          })}
+            )}
+          </div>
+          <input
+            id="portrait-upload" type="file" accept="image/*"
+            style={{display:'none'}}
+            onChange={e => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              const reader = new FileReader()
+              reader.onload = ev => actions.setPortrait(ev.target.result)
+              reader.readAsDataURL(file)
+            }}
+          />
+          {portrait && (
+            <button
+              style={{fontSize:'0.62rem',color:'var(--col-text-dim)',background:'none',border:'none',cursor:'pointer',padding:'2px'}}
+              onClick={() => actions.setPortrait(null)}
+            >✕ 삭제</button>
+          )}
+        </div>
+
+        {/* 특성치 */}
+        <div className="card">
+          <div className="card-title">
+            특성치
+            <span className="card-title-en">CHARACTERISTICS — UPP {uppStr}</span>
+          </div>
+          <div className="stat-grid">
+            {STAT_KEYS.map(k => {
+              const base = baseStats[k] ?? 0
+              const adj  = statAdj[k] ?? 0
+              const v    = stats[k] ?? 0   // 경력으로 변한 현재값
+              const final = v + adj         // 수동 조정 포함 최종값
+              const m    = mod(final)
+              const sm   = specInfo.mods?.[k] ?? 0
+              return (
+                <div key={k} className="stat-card" style={{padding:'0.5rem 0.25rem'}}>
+                  <div className="stat-name">{STAT_EN[k]}</div>
+                  <div className="stat-value" style={{fontSize:'1.4rem'}}>{final}</div>
+                  <div className="stat-name" style={{marginTop:'2px'}}>{STAT_KO[k]}</div>
+                  <div className={`stat-mod ${m>0?'pos':m<0?'neg':''}`}>DM {m>=0?'+':''}{m}</div>
+                  {/* 분해 표시: 기본+경력변화+수동조정 */}
+                  <div style={{fontSize:'0.52rem',color:'var(--col-text-dim)',fontFamily:'var(--font-mono)',marginTop:'3px',lineHeight:1.4}}>
+                    기본 {base}
+                    {v - base !== 0 && <span style={{color: v-base>0?'var(--col-green)':'var(--col-red)'}}> {v-base>0?'+':''}{v-base}</span>}
+                  </div>
+                  {/* 수동 조정 입력 */}
+                  <div style={{display:'flex',alignItems:'center',gap:'2px',marginTop:'4px'}}>
+                    <button
+                      style={{width:'18px',height:'18px',borderRadius:'3px',border:'1px solid var(--col-border)',background:'var(--col-surface)',color:'var(--col-text)',fontSize:'0.7rem',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}
+                      onClick={() => actions.setStatAdjustment(k, adj - 1)}
+                    >−</button>
+                    <span style={{fontSize:'0.65rem',fontFamily:'var(--font-mono)',color: adj>0?'var(--col-green)':adj<0?'var(--col-red)':'var(--col-text-dim)',minWidth:'18px',textAlign:'center'}}>
+                      {adj>0?'+':''}{adj}
+                    </span>
+                    <button
+                      style={{width:'18px',height:'18px',borderRadius:'3px',border:'1px solid var(--col-border)',background:'var(--col-surface)',color:'var(--col-text)',fontSize:'0.7rem',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}
+                      onClick={() => actions.setStatAdjustment(k, adj + 1)}
+                    >+</button>
+                  </div>
+                  {sm !== 0 && <div style={{fontSize:'0.52rem',color:sm>0?'var(--col-green)':'var(--col-red)',fontFamily:'var(--font-mono)'}}>종족 {sm>0?'+':''}{sm}</div>}
+                </div>
+              )
+            })}
+          </div>
+          <div style={{fontSize:'0.62rem',color:'var(--col-text-dim)',fontFamily:'var(--font-mono)',marginTop:'0.5rem'}}>
+            ※ +/− 버튼: 부상·회복·약물 등 경력 외 변화 기록용
+          </div>
         </div>
       </div>
 
@@ -149,6 +233,169 @@ function CharacterSheetPanel({ state, actions, derived }) {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ── 초능력 ── */}
+      <div className="card" style={{marginBottom:'1rem', borderColor: psionic.strength !== null ? 'var(--col-cyan)' : 'var(--col-border)'}}>
+        <div className="card-title"
+          style={{cursor:'pointer', userSelect:'none', display:'flex', justifyContent:'space-between', alignItems:'center'}}
+          onClick={() => setPsionicOpen(o => !o)}
+        >
+          <span>
+            초능력
+            <span className="card-title-en">PSIONICS</span>
+            {psionic.strength !== null && (
+              <span style={{marginLeft:'0.5rem',fontFamily:'var(--font-mono)',fontSize:'0.72rem',color:'var(--col-cyan)'}}>
+                PSI {psionic.strength}
+              </span>
+            )}
+          </span>
+          <span style={{fontSize:'0.75rem',color:'var(--col-text-dim)'}}>{psionicOpen ? '▲' : '▼'}</span>
+        </div>
+
+        {psionicOpen && (
+          <div style={{marginTop:'0.75rem'}}>
+            {/* PSI 강도 */}
+            <div style={{display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1rem'}}>
+              <span style={{fontSize:'0.82rem', color:'var(--col-text-muted)', minWidth:'80px'}}>초능력 강도</span>
+              {psionic.strength === null ? (
+                <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap'}}>
+                  <span style={{fontSize:'0.78rem', color:'var(--col-text-dim)'}}>미검사</span>
+                  <button
+                    className="btn btn-ghost"
+                    style={{fontSize:'0.72rem', padding:'0.2rem 0.6rem', borderColor:'var(--col-cyan)', color:'var(--col-cyan)'}}
+                    onClick={() => actions.setPsionic({ strength: Math.max(1, (state.stats.end ?? 0) - Math.floor(state.age / 4)) })}
+                  >
+                    초능력 발현 (인내 기반 자동계산)
+                  </button>
+                  <button
+                    className="btn btn-ghost"
+                    style={{fontSize:'0.72rem', padding:'0.2rem 0.6rem'}}
+                    onClick={() => actions.setPsionic({ strength: 0 })}
+                  >
+                    초능력 없음 설정
+                  </button>
+                </div>
+              ) : (
+                <div style={{display:'flex', alignItems:'center', gap:'0.5rem'}}>
+                  <button
+                    style={{width:'24px',height:'24px',borderRadius:'4px',border:'1px solid var(--col-border)',background:'var(--col-surface)',color:'var(--col-text)',cursor:'pointer',fontSize:'0.8rem'}}
+                    onClick={() => actions.setPsionic({ strength: Math.max(0, psionic.strength - 1) })}
+                  >−</button>
+                  <span style={{
+                    fontFamily:'var(--font-mono)', fontSize:'1.2rem', fontWeight:700,
+                    color: psionic.strength > 0 ? 'var(--col-cyan)' : 'var(--col-text-dim)',
+                    minWidth:'2rem', textAlign:'center',
+                  }}>
+                    {psionic.strength}
+                  </span>
+                  <button
+                    style={{width:'24px',height:'24px',borderRadius:'4px',border:'1px solid var(--col-border)',background:'var(--col-surface)',color:'var(--col-text)',cursor:'pointer',fontSize:'0.8rem'}}
+                    onClick={() => actions.setPsionic({ strength: Math.min(15, psionic.strength + 1) })}
+                  >+</button>
+                  <span style={{fontSize:'0.72rem',color:'var(--col-text-dim)',fontFamily:'var(--font-mono)'}}>
+                    DM {psionic.strength >= 9 ? '+1' : psionic.strength >= 6 ? '0' : psionic.strength >= 3 ? '-1' : '-2'}
+                  </span>
+                  <button
+                    style={{fontSize:'0.65rem',color:'var(--col-text-dim)',background:'none',border:'none',cursor:'pointer',marginLeft:'0.25rem'}}
+                    onClick={() => actions.setPsionic({ strength: null, talents: [] })}
+                  >✕ 초기화</button>
+                </div>
+              )}
+            </div>
+
+            {/* 초능력 기능 목록 */}
+            {psionic.strength !== null && psionic.strength > 0 && (
+              <div>
+                <div style={{fontSize:'0.72rem',color:'var(--col-text-muted)',fontFamily:'var(--font-mono)',marginBottom:'0.5rem',letterSpacing:'0.08em'}}>
+                  초능력 기능 PSIONIC TALENTS
+                </div>
+                {(psionic.talents ?? []).length === 0 ? (
+                  <p style={{fontSize:'0.78rem',color:'var(--col-text-dim)',marginBottom:'0.5rem'}}>없음</p>
+                ) : (
+                  <div className="skill-list" style={{marginBottom:'0.5rem'}}>
+                    {(psionic.talents ?? []).map((t, i) => (
+                      <div key={i} className="skill-row">
+                        <span className="skill-name" style={{color:'var(--col-cyan)'}}>{t.name}</span>
+                        <span style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
+                          <button
+                            style={{width:'18px',height:'18px',borderRadius:'3px',border:'1px solid var(--col-border)',background:'var(--col-surface)',color:'var(--col-text)',cursor:'pointer',fontSize:'0.7rem',padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}
+                            onClick={() => {
+                              const updated = [...(psionic.talents ?? [])]
+                              updated[i] = { ...updated[i], level: Math.max(0, t.level - 1) }
+                              actions.setPsionic({ talents: updated })
+                            }}
+                          >−</button>
+                          <span className="skill-level" style={{color:'var(--col-cyan)',minWidth:'1.2rem',textAlign:'center'}}>{t.level}</span>
+                          <button
+                            style={{width:'18px',height:'18px',borderRadius:'3px',border:'1px solid var(--col-border)',background:'var(--col-surface)',color:'var(--col-text)',cursor:'pointer',fontSize:'0.7rem',padding:0,display:'flex',alignItems:'center',justifyContent:'center'}}
+                            onClick={() => {
+                              const updated = [...(psionic.talents ?? [])]
+                              updated[i] = { ...updated[i], level: Math.min(4, t.level + 1) }
+                              actions.setPsionic({ talents: updated })
+                            }}
+                          >+</button>
+                          <button
+                            style={{fontSize:'0.65rem',color:'var(--col-red)',background:'none',border:'none',cursor:'pointer',padding:'0 2px'}}
+                            onClick={() => {
+                              const updated = (psionic.talents ?? []).filter((_, j) => j !== i)
+                              actions.setPsionic({ talents: updated })
+                            }}
+                          >✕</button>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* 기능 추가 */}
+                <div style={{display:'flex',gap:'0.5rem',flexWrap:'wrap',alignItems:'center'}}>
+                  <input
+                    type="text" placeholder="기능명 (예: 투시, 텔레파시...)"
+                    value={newTalentName}
+                    onChange={e => setNewTalentName(e.target.value)}
+                    style={{flex:1,minWidth:'120px',fontSize:'0.78rem',padding:'0.3rem 0.6rem'}}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && newTalentName.trim()) {
+                        actions.setPsionic({ talents: [...(psionic.talents ?? []), { name: newTalentName.trim(), level: newTalentLevel }] })
+                        setNewTalentName('')
+                      }
+                    }}
+                  />
+                  <select
+                    value={newTalentLevel}
+                    onChange={e => setNewTalentLevel(Number(e.target.value))}
+                    style={{width:'60px',fontSize:'0.78rem',padding:'0.3rem'}}
+                  >
+                    {[0,1,2,3,4].map(l => <option key={l} value={l}>레벨 {l}</option>)}
+                  </select>
+                  <button
+                    className="btn btn-ghost"
+                    style={{fontSize:'0.75rem',padding:'0.3rem 0.7rem',borderColor:'var(--col-cyan)',color:'var(--col-cyan)'}}
+                    onClick={() => {
+                      if (!newTalentName.trim()) return
+                      actions.setPsionic({ talents: [...(psionic.talents ?? []), { name: newTalentName.trim(), level: newTalentLevel }] })
+                      setNewTalentName('')
+                    }}
+                  >+ 추가</button>
+                </div>
+                {/* 주요 초능력 기능 목록 */}
+                <div style={{marginTop:'0.5rem',fontSize:'0.65rem',color:'var(--col-text-dim)',fontFamily:'var(--font-mono)'}}>
+                  {['투시','강신술','텔레파시','염동력','순간이동','인식'].map(t => (
+                    <span
+                      key={t}
+                      style={{marginRight:'0.5rem',cursor:'pointer',color:'var(--col-text-dim)'}}
+                      onClick={() => {
+                        if ((psionic.talents??[]).some(x=>x.name===t)) return
+                        actions.setPsionic({ talents: [...(psionic.talents??[]), { name:t, level:1 }] })
+                      }}
+                      title="클릭하여 추가"
+                    >＋{t}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── 장갑복 ── */}

@@ -32,6 +32,25 @@ export const INITIAL_STATE = {
     soc: 0,   // 지위
   },
 
+  // 초기 특성치 (Step1에서 배분한 원본값)
+  baseStats: {
+    str: 0, dex: 0, end: 0, int: 0, edu: 0, soc: 0,
+  },
+
+  // 수동 조정값 (캐릭터 시트에서 플레이어가 추가로 입력)
+  statAdjustments: {
+    str: 0, dex: 0, end: 0, int: 0, edu: 0, soc: 0,
+  },
+
+  // 캐릭터 초상화 (base64)
+  portrait: null,
+
+  // 초능력
+  psionic: {
+    strength: null,   // null = 미검사, 0~15 = 초능력 강도
+    talents: [],      // [{ name: '투시', level: 1 }, ...]
+  },
+
   // 미배분 주사위 풀 (각 2D 결과 6개를 굴려 저장)
   statRolls: [],          // e.g. [9, 7, 11, 12, 10, 6]
   statAssignments: {},    // { str: 2, dex: 0, ... } — statRolls 인덱스 매핑
@@ -161,7 +180,10 @@ export const A = {
   RESOLVE_BASIC_TRAINING: 'RESOLVE_BASIC_TRAINING', // { skills }
   CLEAR_NEXT_QUAL_DM:  'CLEAR_NEXT_QUAL_DM',
   APPLY_MEDICAL_DEBT:  'APPLY_MEDICAL_DEBT',
-  MARK_GRAD_BENEFIT_USED: 'MARK_GRAD_BENEFIT_USED',    // { roll, success }
+  MARK_GRAD_BENEFIT_USED: 'MARK_GRAD_BENEFIT_USED',
+  SET_STAT_ADJUSTMENT: 'SET_STAT_ADJUSTMENT',   // { stat, value }
+  SET_PORTRAIT:        'SET_PORTRAIT',           // { dataUrl }
+  SET_PSIONIC:         'SET_PSIONIC',            // { strength, talents }
   RESOLVE_SURVIVAL:    'RESOLVE_SURVIVAL',  // { roll, success }
   RESOLVE_EVENT:       'RESOLVE_EVENT',     // { roll, choice?, effects[] }
   RESOLVE_MISHAP:      'RESOLVE_MISHAP',    // { roll, effects[] }
@@ -225,14 +247,15 @@ export function characterReducer(state, action) {
     }
 
     case A.CONFIRM_STATS: {
-      // 배분 확정 → stats 객체 계산
       const { statRolls, statAssignments } = state
       const stats = {}
       for (const [statKey, rollIdx] of Object.entries(statAssignments)) {
         const roll = statRolls[rollIdx]
         stats[statKey] = (typeof roll === 'object' ? roll.total : roll) ?? 0
       }
-      return { ...state, stats, step: STEPS.BACKGROUND }
+      // baseStats: 경력 진행 중 변하지 않는 초기 배분값
+      const baseStats = { ...stats }
+      return { ...state, stats, baseStats, step: STEPS.BACKGROUND }
     }
 
     // ── Step 2: 배경 기능 ─────────────────────────────────────
@@ -414,13 +437,25 @@ export function characterReducer(state, action) {
       return { ...state, _nextQualDm: 0 }
 
     case A.APPLY_MEDICAL_DEBT: {
-      // 의료비: 1D×10,000 Cr. 현금으로 지불 가능하면 차감, 부족하면 채무
-      const cost = action.amount  // 컴포넌트에서 굴려서 넘김
+      const cost = action.amount
       const canPay = (state.cash ?? 0) >= cost
       return canPay
         ? { ...state, cash: state.cash - cost }
         : { ...state, cash: 0, medicalDebt: (state.medicalDebt ?? 0) + cost - (state.cash ?? 0) }
     }
+
+    case A.SET_STAT_ADJUSTMENT: {
+      const adj = { ...(state.statAdjustments ?? {}), [action.stat]: action.value }
+      // stats = baseStats + 경력 변화 누적 + 수동 조정
+      // 수동 조정은 최종 stats에 반영 (별도 추적)
+      return { ...state, statAdjustments: adj }
+    }
+
+    case A.SET_PORTRAIT:
+      return { ...state, portrait: action.dataUrl }
+
+    case A.SET_PSIONIC:
+      return { ...state, psionic: { ...state.psionic, ...action.psionic } }
 
     case A.MARK_GRAD_BENEFIT_USED: {
       const field = action.field  // 'qualDm' | 'commission'

@@ -426,11 +426,48 @@ export default function StepTerm() {
                   {results.autoAdvance ? (
                     <div>
                       <p style={{fontSize:'0.82rem',color:'var(--col-green)',marginBottom:'0.5rem'}}>
-                        ✦ 사건으로 자동 진급!
+                        ✦ 사건으로 자동 진급! {state.currentIsOfficer ? '계급' : '직급'} {results.newRank}
                       </p>
-                      <button className="btn btn-primary" onClick={() => setSub(needAging ? SUB.AGING : SUB.END)}>
-                        다음 — {needAging ? '노화 굴림' : '주기 종료'} →
-                      </button>
+                      {/* 직급 보너스 표시 */}
+                      {(() => {
+                        const rankList = state.currentIsOfficer
+                          ? (careersData[state.currentCareer]?.ranks?.officer ?? [])
+                          : (careersData[state.currentCareer]?.ranks?.[state.currentSpecialty]
+                            ?? careersData[state.currentCareer]?.ranks?.enlisted
+                            ?? careersData[state.currentCareer]?.ranks?.all ?? [])
+                        const rankEntry = rankList.find(r => r.rank === results.newRank)
+                        if (!rankEntry?.bonus) return null
+                        return (
+                          <div style={{padding:'0.5rem 0.75rem',marginBottom:'0.75rem',background:'rgba(200,168,75,0.07)',border:'1px solid var(--col-gold-dim)',borderRadius:'var(--radius-md)'}}>
+                            <div style={{fontFamily:'var(--font-mono)',fontSize:'0.65rem',color:'var(--col-gold)',marginBottom:'3px'}}>
+                              ✦ {state.currentIsOfficer ? '계급' : '직급'} {results.newRank} 혜택
+                            </div>
+                            <div style={{fontSize:'0.82rem',color:'var(--col-text)'}}>{rankEntry.bonus}</div>
+                            <div style={{fontSize:'0.72rem',color:'var(--col-text-muted)',marginTop:'2px'}}>(자동 적용됩니다)</div>
+                          </div>
+                        )
+                      })()}
+                      {/* 기능 표 추가 굴림 (룰북: 진급 시 기능 표 1회 추가) */}
+                      {!results.autoAdvanceSkillDone ? (
+                        <div>
+                          <div style={{fontFamily:'var(--font-mono)',fontSize:'0.68rem',color:'var(--col-cyan)',marginBottom:'0.5rem'}}>
+                            ✦ 진급 보너스 — 기능 표 추가 굴림 1회
+                          </div>
+                          <SkillTrainingPanel
+                            career={careersData[state.currentCareer]}
+                            specialty={careersData[state.currentCareer]?.specialties?.find(s => s.id === state.currentSpecialty)}
+                            isFirstTerm={false}
+                            onDone={(skillsGained) => {
+                              actions.resolveBasicTraining(skillsGained)
+                              setResults(rv => ({ ...rv, autoAdvanceSkillDone: true }))
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <button className="btn btn-primary" onClick={() => setSub(needAging ? SUB.AGING : SUB.END)}>
+                          다음 — {needAging ? '노화 굴림' : '주기 종료'} →
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <button className="btn btn-primary" onClick={() => setSub(SUB.ADVANCEMENT)}>
