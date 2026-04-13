@@ -77,7 +77,11 @@ export default function StepPreCareer() {
 
   // 입학 성공 → 다음 단계
   const afterEntry = (success) => {
-    if (!success) { setPhase('entry'); return }
+    if (!success) {
+      // 입학 실패 → 이번 주기에 경력 전교육 불가, 경력 선택으로
+      actions.skipPreCareer()
+      return
+    }
     if (option?.skillSelect) setPhase('skills')
     else setPhase('event')
   }
@@ -148,7 +152,7 @@ export default function StepPreCareer() {
           </div>
           <div className="flex justify-between items-center">
             <span className="text-muted" style={{fontSize:'0.78rem'}}>한 번만 선택할 수 있으며, 3주기까지 가능합니다.</span>
-            <button className="btn btn-ghost" onClick={actions.skipPreCareer}>건너뛰기</button>
+            <button className="btn btn-ghost" onClick={actions.skipPreCareerSkip}>건너뛰기</button>
           </div>
         </>
       )}
@@ -157,10 +161,13 @@ export default function StepPreCareer() {
         <div className="card" style={{ marginBottom:'1.5rem' }}>
           <div className="card-title">
             {option.name}
-            <button className="btn btn-ghost" style={{marginLeft:'auto',fontSize:'0.7rem',padding:'2px 8px'}}
-              onClick={() => { setSelected(null); setEntryResult(null); setGradResult(null); setPhase('entry') }}>
-              ← 다시 선택
-            </button>
+            {/* 졸업 굴림 전(gradResult 없음)에만 다시 선택 가능 */}
+            {!gradResult && !entryResult && (
+              <button className="btn btn-ghost" style={{marginLeft:'auto',fontSize:'0.7rem',padding:'2px 8px'}}
+                onClick={() => { setSelected(null); setEntryResult(null); setGradResult(null); setPhase('entry') }}>
+                ← 다시 선택
+              </button>
+            )}
           </div>
 
           {/* ① 입학 굴림 */}
@@ -172,33 +179,32 @@ export default function StepPreCareer() {
               </p>
               {!entryResult ? (
                 <DiceRollInline
-                  label={`입학 굴림 — ${option.check.label}`}
+                  label="입학 굴림"
+                  stat={option.check.label.split(' ')[0]}
+                  target={option.check.target}
                   count={2}
                   mod={sm(state.stats[option.check.stat]) - termCount}
-                  target={option.check.target}
+                  breakdown={[
+                    { label: `${option.check.label.split(' ')[0]} 수정치`, value: sm(state.stats[option.check.stat]) },
+                    ...(termCount > 0 ? [{ label:'이전 교육 패널티', value: -termCount }] : []),
+                  ].filter(b => b.value !== 0)}
                   onResult={({ values, total, success }) => {
                     const mod = sm(state.stats[option.check.stat]) - termCount
                     setEntryResult({ roll: values[0]+values[1], mod, total, success })
+                    if (success) afterEntry(true)
                   }}
+                  onNext={null}
                 />
               ) : (
-                <>
-                  <div className={`roll-result ${entryResult.success ? 'success' : 'failure'}`} style={{marginBottom:'0.75rem'}}>
-                    <div className={`roll-total ${entryResult.success ? 'success' : 'failure'}`}>{entryResult.total}</div>
-                    <div className="roll-detail">
-                      2D({entryResult.roll}) + DM({entryResult.mod}) = {entryResult.total}<br/>
-                      {entryResult.success ? '✓ 입학 성공!' : '✗ 입학 실패'}
-                    </div>
-                  </div>
-                  {!entryResult.success && (
+                /* 입학 실패 시만 경력 선택 버튼 표시 */
+                !entryResult.success && (
+                  <div style={{marginTop:'0.5rem'}}>
+                    <p style={{fontSize:'0.78rem',color:'var(--col-amber)',marginBottom:'0.5rem'}}>
+                      입학 실패. 이번 주기에는 경력 전교육을 받을 수 없습니다.
+                    </p>
                     <button className="btn btn-primary" onClick={actions.skipPreCareer}>경력 선택으로 →</button>
-                  )}
-                  {entryResult.success && (
-                    <button className="btn btn-primary" style={{marginTop:'0.5rem'}} onClick={() => afterEntry(true)}>
-                      다음 — {option.skillSelect ? '기능 선택' : '사건 굴림'} →
-                    </button>
-                  )}
-                </>
+                  </div>
+                )
               )}
             </div>
           )}
@@ -286,10 +292,14 @@ export default function StepPreCareer() {
               </p>
               {!gradResult ? (
                 <DiceRollInline
-                  label={`졸업 굴림 — ${option.gradCheck.label}`}
+                  label="졸업 굴림"
+                  stat={option.gradCheck.label.split(' ')[0]}
+                  target={option.gradCheck.target}
                   count={2}
                   mod={sm(state.stats[option.gradCheck.stat])}
-                  target={option.gradCheck.target}
+                  breakdown={[
+                    { label: `${option.gradCheck.label.split(' ')[0]} 수정치`, value: sm(state.stats[option.gradCheck.stat]) },
+                  ].filter(b => b.value !== 0)}
                   onResult={({ values, total, success }) => {
                     const mod = sm(state.stats[option.gradCheck.stat])
                     setGradResult({ roll: values[0]+values[1], mod, total, success })

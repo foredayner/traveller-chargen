@@ -468,49 +468,59 @@ export default function DiceRollButton({
 }
 
 // ─────────────────────────────────────────────────────────────
-//  DiceRollInline — 버튼+결과를 한 줄에 표시하는 컴팩트 버전
-//  EventResolver, StepTerm 등의 판정 버튼에 사용
+//  DiceRollInline — 판정 UI 통합 컴포넌트
+//
+//  props:
+//    label        : 판정 이름 (예: "생존 굴림")
+//    stat         : 판정 특성치 이름 (예: "인내")
+//    target       : 목표 수치 (예: 5) — 없으면 단순 굴림
+//    count        : 주사위 개수 (기본 2)
+//    sides        : 주사위 면수 (기본 6)
+//    mod          : 총 수정치 합계
+//    breakdown    : DM 출처 배열 [{ label, value }]
+//                   예: [{ label:'인내 수정치', value:+1 }, { label:'졸업 DM', value:+2 }]
+//    onResult     : (result) => void  — 굴림 직후 호출
+//    onNext       : () => void        — "다음 →" 버튼 클릭 시 호출
+//    variant      : 'primary'|'danger'
+//    disabled     : boolean
 // ─────────────────────────────────────────────────────────────
 export function DiceRollInline({
   label,
-  sides  = 6,
-  count  = 2,
-  mod    = 0,
+  stat,
   target,
+  sides    = 6,
+  count    = 2,
+  mod      = 0,
+  breakdown = [],
   onResult,
-  variant = 'primary',
+  onNext,
+  variant  = 'primary',
   disabled = false,
 }) {
-  const [phase, setPhase]         = useState('idle')  // idle|rolling|done
-  const [displayVals, setDisplay] = useState(null)
-  const [finalVals, setFinal]     = useState(null)
+  const [phase, setPhase]     = useState('idle')   // idle|rolling|done
+  const [displayVals, setDisp]= useState(null)
+  const [finalVals, setFinal] = useState(null)
   const timerRef = useRef(null)
-
   const clearTimer = () => { if (timerRef.current) clearTimeout(timerRef.current) }
   useEffect(() => () => clearTimer(), [])
 
   const doRoll = () => {
-    if (phase === 'rolling') return
+    if (phase !== 'idle') return
     clearTimer()
     setPhase('rolling')
     setFinal(null)
-
     const finals = Array.from({ length: count }, () => Math.floor(Math.random() * sides) + 1)
-
-    let frame = 0
-    let interval = ANIM_INTERVAL
-
+    let frame = 0, interval = ANIM_INTERVAL
     const tick = () => {
       if (frame >= ANIM_FRAMES) {
-        setDisplay([...finals])
-        setFinal([...finals])
-        setPhase('done')
-        const total = finals.reduce((s,v)=>s+v,0) + mod
-        onResult?.({ values: finals, total, success: target !== undefined ? total >= target : undefined, mod })
+        setDisp([...finals]); setFinal([...finals]); setPhase('done')
+        const total   = finals.reduce((s,v)=>s+v,0) + mod
+        const success = target !== undefined ? total >= target : undefined
+        onResult?.({ values: finals, total, success, mod })
         return
       }
       const isNear = frame >= ANIM_FRAMES - 2
-      setDisplay(finals.map(f => isNear ? f : Math.floor(Math.random() * sides) + 1))
+      setDisp(finals.map(f => isNear ? f : Math.floor(Math.random()*sides)+1))
       frame++
       interval = Math.min(interval * ANIM_SLOWDOWN, 280)
       timerRef.current = setTimeout(tick, interval)
@@ -518,143 +528,190 @@ export function DiceRollInline({
     tick()
   }
 
-  const total   = finalVals ? finalVals.reduce((s,v)=>s+v,0) + mod : null
-  const success = total !== null && target !== undefined ? total >= target : null
-  const rolling = phase === 'rolling'
-  const done    = phase === 'done'
+  const rawTotal  = finalVals ? finalVals.reduce((s,v)=>s+v,0) : null
+  const total     = rawTotal !== null ? rawTotal + mod : null
+  const success   = total !== null && target !== undefined ? total >= target : null
+  const rolling   = phase === 'rolling'
+  const done      = phase === 'done'
 
-  const cMap = {
-    primary: { border:'var(--col-gold)',  text:'var(--col-gold)',  bg:'rgba(200,168,75,0.08)' },
-    danger:  { border:'var(--col-red)',   text:'var(--col-red)',   bg:'rgba(224,82,82,0.08)'  },
-    ghost:   { border:'var(--col-border)',text:'var(--col-text-muted)',bg:'transparent' },
-  }
-  const c = cMap[variant] ?? cMap.primary
-
-  const resultBorder = success === true ? 'var(--col-green)'
-                     : success === false ? 'var(--col-red)'
-                     : c.border
+  const accentColor = success === true  ? 'var(--col-green)'
+                    : success === false ? 'var(--col-red)'
+                    : variant === 'danger' ? 'var(--col-red)'
+                    : 'var(--col-gold)'
 
   return (
     <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.75rem',
-      padding: '0.65rem 1rem',
-      background: 'var(--col-deep)',
-      borderRadius: 'var(--radius-md)',
-      border: `1.5px solid ${done ? resultBorder : c.border}`,
-      transition: 'border-color 0.3s',
-      cursor: !done || rolling ? 'default' : 'default',
+      border:`1.5px solid ${done ? accentColor : 'var(--col-border)'}`,
+      borderRadius:'var(--radius-lg)',
+      overflow:'hidden',
+      transition:'border-color 0.3s',
     }}>
-
-      {/* 주사위 면들 */}
-      <div style={{ display:'flex', gap:'0.3rem' }}>
-        {(displayVals ?? Array(count).fill(undefined)).map((v, i) => (
-          <DiceFace
-            key={i}
-            value={v}
-            size={40}
-            color={done ? (success === true ? 'var(--col-green)' : success === false ? 'var(--col-red)' : 'var(--col-cyan)') : c.text}
-            glowing={done && success !== null}
-            rolling={rolling}
-            dim={!displayVals}
-          />
-        ))}
-      </div>
-
-      {/* 수식 + 결과 */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {/* 라벨 */}
-        <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.65rem', color:'var(--col-text-dim)', letterSpacing:'0.1em', marginBottom:'1px' }}>
+      {/* ── 헤더: 판정 이름 + 난이도 ── */}
+      <div style={{
+        padding:'0.6rem 1rem',
+        background:'rgba(255,255,255,0.02)',
+        borderBottom:`1px solid var(--col-border)`,
+        display:'flex', justifyContent:'space-between', alignItems:'center',
+      }}>
+        <div style={{ fontFamily:'var(--font-display)', fontSize:'0.85rem', color:'var(--col-text)', letterSpacing:'0.05em' }}>
           {label}
         </div>
-
-        {/* 수식 */}
-        {done && finalVals && (
-          <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.78rem', color:'var(--col-text-muted)', display:'flex', gap:'0.25rem', alignItems:'baseline', flexWrap:'wrap' }}>
-            {count > 1 && <span style={{ color:'var(--col-text-dim)' }}>({finalVals.join('+')})</span>}
-            {mod !== 0 && (
-              <span style={{ color: mod > 0 ? 'var(--col-green)' : 'var(--col-red)' }}>
-                {mod > 0 ? '+' : ''}{mod}
-              </span>
-            )}
-            {target !== undefined && (
-              <>
-                <span style={{ color:'var(--col-text-dim)' }}>=</span>
-                <span style={{
-                  fontSize: '1rem',
-                  fontWeight: 500,
-                  color: success ? 'var(--col-green)' : 'var(--col-red)',
-                  textShadow: `0 0 8px ${success ? 'rgba(82,201,122,0.4)' : 'rgba(224,82,82,0.4)'}`,
-                }}>
-                  {total}
-                </span>
-                <span style={{ color:'var(--col-text-dim)', fontSize:'0.7rem' }}>vs {target}+</span>
-              </>
-            )}
-            {target === undefined && (
-              <>
-                <span style={{ color:'var(--col-text-dim)' }}>=</span>
-                <span style={{ fontSize:'1rem', fontWeight:500, color:'var(--col-cyan)' }}>{total}</span>
-              </>
-            )}
-          </div>
-        )}
-
-        {rolling && (
-          <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.72rem', color:c.text, animation:'pulse 0.5s ease infinite alternate', letterSpacing:'0.08em' }}>
-            굴리는 중…
+        {target !== undefined && (
+          <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.72rem', color:'var(--col-text-muted)' }}>
+            {stat && <span style={{ color:'var(--col-cyan)' }}>{stat} </span>}
+            <span style={{ color:accentColor, fontWeight:600 }}>{target}+</span>
+            {` (목표 ${target})`}
           </div>
         )}
       </div>
 
-      {/* 판정 결과 배지 또는 굴리기 버튼 */}
-      <div style={{ flexShrink: 0 }}>
-        {!done && !rolling && (
-          <button
-            disabled={disabled}
-            onClick={doRoll}
-            style={{
-              fontFamily: 'var(--font-body)',
-              fontSize: '0.8rem',
-              padding: '0.4rem 0.9rem',
-              border: `1.5px solid ${c.border}`,
-              borderRadius: 'var(--radius-md)',
-              background: c.bg,
-              color: c.text,
-              cursor: disabled ? 'not-allowed' : 'pointer',
-              opacity: disabled ? 0.4 : 1,
-              transition: 'all 0.12s',
-              letterSpacing: '0.02em',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            🎲 굴리기
-          </button>
-        )}
+      {/* ── 본문 ── */}
+      <div style={{ padding:'0.75rem 1rem' }}>
 
-        {done && success !== null && (
+        {/* DM 출처 목록 */}
+        {breakdown.length > 0 && (
           <div style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: '0.82rem',
-            letterSpacing: '0.1em',
-            color: success ? 'var(--col-green)' : 'var(--col-red)',
-            textShadow: `0 0 12px ${success ? 'rgba(82,201,122,0.5)' : 'rgba(224,82,82,0.5)'}`,
-            animation: 'resultPop 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards',
-            whiteSpace: 'nowrap',
+            marginBottom:'0.65rem',
+            padding:'0.4rem 0.6rem',
+            background:'rgba(255,255,255,0.02)',
+            borderRadius:'var(--radius-sm)',
+            border:'1px solid var(--col-border)',
           }}>
-            {success ? '성공' : '실패'}
+            <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.6rem', color:'var(--col-text-dim)', letterSpacing:'0.1em', marginBottom:'3px' }}>
+              수정치 출처
+            </div>
+            {breakdown.map((b, i) => (
+              <div key={i} style={{
+                display:'flex', justifyContent:'space-between',
+                fontFamily:'var(--font-mono)', fontSize:'0.72rem',
+                color: b.value > 0 ? 'var(--col-green)' : b.value < 0 ? 'var(--col-red)' : 'var(--col-text-muted)',
+                padding:'1px 0',
+              }}>
+                <span style={{ color:'var(--col-text-muted)' }}>{b.label}</span>
+                <span style={{ fontWeight:500 }}>{b.value > 0 ? '+' : ''}{b.value}</span>
+              </div>
+            ))}
+            {breakdown.length > 1 && (
+              <div style={{
+                display:'flex', justifyContent:'space-between',
+                fontFamily:'var(--font-mono)', fontSize:'0.72rem',
+                borderTop:'1px solid var(--col-border)', marginTop:'3px', paddingTop:'3px',
+                color:'var(--col-text)',
+              }}>
+                <span>합계</span>
+                <span style={{ fontWeight:600, color: mod > 0 ? 'var(--col-green)' : mod < 0 ? 'var(--col-red)' : 'var(--col-text-muted)' }}>
+                  {mod > 0 ? '+' : ''}{mod}
+                </span>
+              </div>
+            )}
           </div>
         )}
 
-        {done && success === null && (
-          <div style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: '1rem',
-            color: 'var(--col-cyan)',
-            fontWeight: 500,
-          }}>
-            {total}
+        {/* 주사위 + 굴리기 버튼 */}
+        {!done && (
+          <div style={{ display:'flex', alignItems:'center', gap:'0.75rem' }}>
+            <div style={{ display:'flex', gap:'0.3rem' }}>
+              {(displayVals ?? Array(count).fill(undefined)).map((v, i) => (
+                <DiceFace key={i} value={v} size={44} color={accentColor} rolling={rolling} dim={!displayVals} />
+              ))}
+            </div>
+            <div style={{ flex:1 }}>
+              {rolling ? (
+                <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.72rem', color:'var(--col-text-muted)' }}>
+                  굴리는 중…
+                </div>
+              ) : (
+                <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.7rem', color:'var(--col-text-dim)' }}>
+                  {count}D{sides}{mod !== 0 ? ` + (${mod > 0 ? '+' : ''}${mod})` : ''}{target !== undefined ? ` vs ${target}+` : ''}
+                </div>
+              )}
+            </div>
+            {!rolling && (
+              <button
+                disabled={disabled}
+                onClick={doRoll}
+                style={{
+                  fontFamily:'var(--font-body)', fontSize:'0.85rem',
+                  padding:'0.45rem 1.1rem',
+                  border:`1.5px solid ${accentColor}`,
+                  borderRadius:'var(--radius-md)',
+                  background:`rgba(${variant==='danger'?'224,82,82':'200,168,75'},0.1)`,
+                  color: accentColor,
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  opacity: disabled ? 0.4 : 1,
+                  whiteSpace:'nowrap', letterSpacing:'0.02em',
+                }}
+              >
+                🎲 굴리기
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* 결과 화면 */}
+        {done && finalVals && (
+          <div>
+            {/* 주사위 + 수식 */}
+            <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'0.75rem' }}>
+              <div style={{ display:'flex', gap:'0.3rem' }}>
+                {finalVals.map((v, i) => (
+                  <DiceFace key={i} value={v} size={44} color={accentColor} glowing />
+                ))}
+              </div>
+              <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.85rem', color:'var(--col-text-muted)' }}>
+                {count > 1 ? `(${finalVals.join(' + ')})` : finalVals[0]}
+                {mod !== 0 && (
+                  <span style={{ color: mod>0?'var(--col-green)':'var(--col-red)' }}>
+                    {' '}{mod>0?'+':''}{mod}
+                  </span>
+                )}
+                {' '}={' '}
+                <span style={{ fontSize:'1.1rem', fontWeight:700, color:accentColor }}>
+                  {total}
+                </span>
+                {target !== undefined && (
+                  <span style={{ fontSize:'0.72rem', color:'var(--col-text-dim)', marginLeft:'0.3rem' }}>
+                    vs {target}+
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* 성공/실패 배너 */}
+            {success !== null && (
+              <div style={{
+                padding:'0.55rem 0.9rem',
+                borderRadius:'var(--radius-md)',
+                background: success ? 'rgba(82,201,122,0.08)' : 'rgba(224,82,82,0.08)',
+                border:`1px solid ${success?'var(--col-green)':'var(--col-red)'}`,
+                display:'flex', alignItems:'center', justifyContent:'space-between',
+                marginBottom: onNext ? '0.75rem' : '0',
+              }}>
+                <div style={{
+                  fontFamily:'var(--font-display)', fontSize:'0.95rem',
+                  color: success ? 'var(--col-green)' : 'var(--col-red)',
+                  letterSpacing:'0.1em',
+                }}>
+                  {success ? '✓ 성공' : '✗ 실패'}
+                </div>
+                {target !== undefined && (
+                  <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.68rem', color:'var(--col-text-dim)' }}>
+                    {total} {success ? '≥' : '<'} {target}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 다음 버튼 */}
+            {onNext && (
+              <button
+                className="btn btn-primary"
+                onClick={onNext}
+                style={{ width:'100%', marginTop:'0' }}
+              >
+                다음 →
+              </button>
+            )}
           </div>
         )}
       </div>

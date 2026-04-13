@@ -812,6 +812,7 @@ function CheckEffect({ effect, state, actions, onDone }) {
         count={2}
         mod={getDm()}
         target={effect.target}
+        breakdown={getDm() !== 0 ? [{ label:'수정치', value: getDm() }] : []}
         onResult={({ values, total, success }) => {
           setResult({ roll: values[0]+(values[1]??0), mod: getDm(), total, success })
         }}
@@ -934,8 +935,9 @@ function InjuryEffect({ effect, state, actions, onDone }) {
               ⚕ 의료 채무 — 1D × Cr10,000
             </div>
             <DiceRollInline
-              label="의료비 굴림 — 1D"
+              label="의료비 굴림 (1D × Cr10,000)"
               count={1} sides={6} mod={0}
+              breakdown={[]}
               onResult={({ values }) => {
                 const cost = values[0] * 10000
                 setMedDebt(cost)
@@ -968,8 +970,9 @@ function InjuryEffect({ effect, state, actions, onDone }) {
         {isHigh   && <span className="badge badge-red" style={{ marginLeft:'0.5rem' }}>두 번 굴려 높은 값</span>}
       </div>
       <DiceRollInline
-        label="부상 표 — 1D"
+        label="부상 표 굴림"
         count={1} sides={6} mod={0}
+        breakdown={[]}
         variant="danger"
         onResult={({ values }) => {
           let roll = values[0]
@@ -1115,8 +1118,9 @@ function LifeEventEffect({ state, actions, onDone }) {
     <div className="card" style={{ marginBottom:'0.75rem', borderColor:'var(--col-cyan)' }}>
       <div className="card-title" style={{ fontSize:'0.85rem', color:'var(--col-cyan)' }}>생활 사건 표 굴림</div>
       <DiceRollInline
-        label="생활 사건 — 2D"
+        label="생활 사건 굴림"
         count={2} mod={0}
+        breakdown={[]}
         onResult={({ total }) => setTimeout(() => setRoll(total), 600)}
       />
     </div>

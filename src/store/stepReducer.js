@@ -44,6 +44,7 @@ export const INITIAL_STATE = {
   preCareer: null,        // null | 'university' | 'army_academy' | 'marine_academy' | 'navy_academy'
   preCareerSuccess: null, // null | true | false
   preCareerHonors: false, // 우등 졸업 여부 (결괏값 10+)
+  preCareerAttempted: false, // 이번 주기에 입학을 시도했는지
 
   // 졸업 혜택 플래그 (경력 선택에서 소비됨)
   gradBenefits: {
@@ -144,7 +145,8 @@ export const A = {
 
   // Step 3: 경력 전 교육
   GO_PRE_CAREER:       'GO_PRE_CAREER',   // 경력 전교육 재진입
-  SKIP_PRE_CAREER:     'SKIP_PRE_CAREER',
+  SKIP_PRE_CAREER:      'SKIP_PRE_CAREER',       // 입학 시도 후 실패
+  SKIP_PRE_CAREER_SKIP: 'SKIP_PRE_CAREER_SKIP',  // 건너뛰기 (미시도)
   SELECT_PRE_CAREER:   'SELECT_PRE_CAREER',
   RESOLVE_PRE_CAREER:  'RESOLVE_PRE_CAREER', // { success, skills }
 
@@ -265,7 +267,13 @@ export function characterReducer(state, action) {
     }
 
     case A.SKIP_PRE_CAREER: {
-      return { ...state, preCareer: null, step: STEPS.CAREER }
+      // 입학 시도했지만 실패 → attempted 표시
+      return { ...state, preCareer: null, preCareerAttempted: true, step: STEPS.CAREER }
+    }
+
+    case A.SKIP_PRE_CAREER_SKIP: {
+      // 건너뛰기 선택 → 시도 안 한 것, attempted false 유지
+      return { ...state, preCareer: null, preCareerAttempted: false, step: STEPS.CAREER }
     }
 
     case A.SELECT_PRE_CAREER: {
@@ -340,9 +348,10 @@ export function characterReducer(state, action) {
 
       return {
         ...state,
-        preCareer,             // 선택한 교육 기관 저장
+        preCareer,
         preCareerSuccess: success,
         preCareerHonors: honors,
+        preCareerAttempted: true,
         gradBenefits,
         skills,
         stats,
@@ -526,6 +535,7 @@ export function characterReducer(state, action) {
         ...next,
         currentTerm: state.currentTerm + 1,
         age: state.age + 4,
+        preCareerAttempted: false,  // 새 주기에서 경력전교육 재시도 가능
         step: STEPS.TERM,
       }
     }
@@ -539,7 +549,8 @@ export function characterReducer(state, action) {
         currentCareer: null,
         currentSpecialty: null,
         currentIsOfficer: false,
-        currentRank: 0,   // 새 경력 시작 시 직급 초기화
+        currentRank: 0,
+        preCareerAttempted: false,
         age: alreadyRecorded ? state.age : state.age + 4,
         step: STEPS.CAREER,
       }

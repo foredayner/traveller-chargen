@@ -344,16 +344,21 @@ export default function StepCareer() {
                     </div>
                   )}
                 <DiceRollInline
-                  label={`자격 굴림 — ${career.qualification.stat.toUpperCase()} ${career.qualification.target}+${
-                    prevCareerCount > 0 ? ` (경력 DM ${-prevCareerCount})` : ''}${
-                    qualDm > 0 ? ` (보너스 DM +${qualDm})` : ''}`}
+                  label="자격 굴림"
+                  stat={career.qualification.stat === 'dex_or_int' ? '민첩/지능' : career.qualification.stat.toUpperCase()}
+                  target={career.qualification.target}
                   count={2}
                   mod={statModifier(state.stats[
                     career.qualification.stat === 'dex_or_int'
                       ? (state.stats.dex >= state.stats.int ? 'dex' : 'int')
                       : career.qualification.stat
                   ] ?? 0) - prevCareerCount + qualDm}
-                  target={career.qualification.target}
+                  breakdown={[
+                    { label:'특성치 수정치', value: statModifier(state.stats[career.qualification.stat === 'dex_or_int' ? (state.stats.dex >= state.stats.int ? 'dex' : 'int') : career.qualification.stat] ?? 0) },
+                    ...(prevCareerCount > 0 ? [{ label:'이전 경력 패널티', value: -prevCareerCount }] : []),
+                    ...(gradDm > 0 ? [{ label:'졸업 DM', value: gradDm }] : []),
+                    ...(eventDm > 0 ? [{ label:'사건 DM', value: eventDm }] : []),
+                  ].filter(b => b.value !== 0)}
                   onResult={({ values, total, success }) => {
                     setQualResult({ total, success })
                     actions.resolveQualRoll(success)
@@ -391,8 +396,8 @@ export default function StepCareer() {
         )
       })()}
 
-      {/* 경력 전교육 재진입 (3주기 미만) */}
-      {prevCareerCount < 3 && prevCareerCount > 0 && !state.preCareerSuccess && (
+      {/* 경력 전교육 재진입 (3주기 미만 + 이번 주기 미시도) */}
+      {prevCareerCount < 3 && prevCareerCount > 0 && !state.preCareerAttempted && (
         <div style={{
           marginTop:'1rem', padding:'0.75rem 1rem',
           background:'rgba(78,205,196,0.05)',

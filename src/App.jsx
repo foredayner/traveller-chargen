@@ -4,7 +4,7 @@
 //  Cinzel (라틴 세리프) + Noto Serif KR (한글) + Share Tech Mono (숫자)
 // ─────────────────────────────────────────────────────────────
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useCharacterContext } from './store/CharacterContext.jsx'
 import { STEPS } from './store/stepReducer.js'
 import SideSheet from './components/SideSheet.jsx'
@@ -46,15 +46,22 @@ export default function App() {
     sessionStorage.removeItem('traveller_user')
     setUser(null); setScreen('slots'); setCurSlot(null)
   }
+  const [pendingLoad, setPendingLoad] = useState(null)  // 불러올 state 대기
+
   const handleSelectSlot = async ({ slot, mode }) => {
     setCurSlot(slot)
     if (mode === 'load') {
       try {
-        const charState = await loadCharacter(user.key, slot)
-        actions.loadState(charState)
+        const rawState = await loadCharacter(user.key, slot)
+        const charState = typeof rawState === 'string' ? JSON.parse(rawState) : rawState
+        if (!charState || typeof charState !== 'object') {
+          alert('저장 데이터를 불러오는 데 실패했습니다.')
+          return
+        }
+        setPendingLoad(charState)  // game 화면 전환 후 useEffect에서 처리
       } catch (e) { alert(e.message); return }
     } else {
-      actions.resetCharacter()
+      setPendingLoad('new')  // 새 캐릭터
     }
     setScreen('game')
   }
@@ -68,6 +75,17 @@ export default function App() {
     } catch (e) { setSaveMsg('저장 실패') }
     finally { setSaving(false) }
   }
+
+  // game 화면 진입 후 pendingLoad 처리
+  useEffect(() => {
+    if (screen !== 'game' || pendingLoad === null) return
+    if (pendingLoad === 'new') {
+      actions.resetCharacter()
+    } else {
+      actions.loadState(pendingLoad)
+    }
+    setPendingLoad(null)
+  }, [screen, pendingLoad])
 
   if (!user) return <AuthScreen onLogin={handleLogin} />
   if (screen === 'slots') return (

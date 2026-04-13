@@ -98,6 +98,10 @@ export function useCharacter() {
     dispatch({ type: A.SKIP_PRE_CAREER })
   }, [])
 
+  const skipPreCareerSkip = useCallback(() => {
+    dispatch({ type: A.SKIP_PRE_CAREER_SKIP })
+  }, [])
+
   const goPreCareer = useCallback(() => {
     dispatch({ type: A.GO_PRE_CAREER })
   }, [])
@@ -289,6 +293,7 @@ export function useCharacter() {
       confirmBackground,
       // Step 3
       skipPreCareer,
+      skipPreCareerSkip,
       goPreCareer,
       selectPreCareer,
       resolvePreCareer,
@@ -328,6 +333,7 @@ export function useCharacter() {
       resetCharacter,
       exportJSON,
       importJSON,
+      loadState,
     },
     // 저수준 dispatch (특수 케이스용)
     dispatch,
