@@ -230,13 +230,19 @@ export default function StepTerm() {
                           ...(notFirstDm < 0 ? [{ label:'비첫주기 페널티', value: notFirstDm }] : []),
                         ].filter(b => b.value !== 0)}
                         onResult={({ values, total, success }) => {
-                          const r = { roll: values[0]+values[1], mod: statModifier(state.stats.soc??0)+commDm+notFirstDm, total, success }
-                          setResults(rv => ({ ...rv, commission: r }))
+                          // commission을 여기서 세팅하면 DiceRollInline이 언마운트됨
+                          // → onNext에서 세팅하도록 임시 보관
                           actions.rollCommission(success)
                           if (isFirstGradMilitary) actions.markGradBenefitUsed('commission')
                           if (success) applyRankBonus(1)
+                          // 임시 저장 (다음 버튼 클릭 전까지 commission 미세팅)
+                          setResults(rv => ({ ...rv, _commissionPending: { roll: values[0]+values[1], mod: statModifier(state.stats.soc??0)+commDm+notFirstDm, total, success } }))
                         }}
-                        onNext={() => setSub(SUB.SURVIVAL)}
+                        onNext={() => {
+                          const pending = results._commissionPending
+                          if (pending) setResults(rv => ({ ...rv, commission: pending, _commissionPending: null }))
+                          setSub(SUB.SURVIVAL)
+                        }}
                       />
                     )}
                     <button className="btn btn-ghost" style={{ alignSelf:'flex-start' }}
@@ -275,10 +281,13 @@ export default function StepTerm() {
               ].filter(b => b.value !== 0)}
               onResult={({ values, total, success }) => {
                 const r = { roll: values[0]+values[1], mod: statModifier(state.stats[specialty?.survival.stat??'end']??0), total, success }
-                setResults(rv => ({ ...rv, survival: r, _survivalSuccess: success }))
+                setResults(rv => ({ ...rv, _survivalPending: r, _survivalSuccess: success }))
                 actions.resolveSurvival(success)
               }}
-              onNext={() => setSub(results._survivalSuccess ? SUB.EVENT : SUB.MISHAP)}
+              onNext={() => {
+                setResults(rv => ({ ...rv, survival: rv._survivalPending ?? {}, _survivalPending: null }))
+                setSub(results._survivalSuccess ? SUB.EVENT : SUB.MISHAP)
+              }}
             />
           )}
         </div>
@@ -473,9 +482,17 @@ export default function StepTerm() {
                   const newRank = success ? Math.min(6, (state.currentRank ?? 0) + 1) : (state.currentRank ?? 0)
                   const forcedEnd      = !success && rawRoll <= state.currentTerm
                   const forcedContinue = rawRoll === 12
-                  setResults(rv => ({ ...rv, advancement: { roll:rawRoll, mod:totalMod, total, success, forcedEnd, forcedContinue }, newRank }))
+                  setResults(rv => ({ ...rv, _advancementPending: { roll:rawRoll, mod:totalMod, total, success, forcedEnd, forcedContinue }, _advNewRank: newRank }))
                   actions.resolveAdvancement(success, newRank)
                   if (success && newRank > 0) applyRankBonus(newRank)
+                }}
+                onNext={() => {
+                  setResults(rv => ({
+                    ...rv,
+                    advancement: rv._advancementPending ?? {},
+                    newRank: rv._advNewRank,
+                    _advancementPending: null
+                  }))
                 }}
               />
             )}
@@ -544,10 +561,13 @@ export default function StepTerm() {
             onResult={({ values, total }) => {
               const agingEntry = getAgingResult(total)
               const res = { roll: values[0]+values[1], dm: derived.agingDm, total, entry: agingEntry }
-              setResults(rv => ({ ...rv, aging: res }))
+              setResults(rv => ({ ...rv, _agingPending: res }))
               actions.resolveAging(agingEntry.effects ?? [])
             }}
-            onNext={() => setSub(SUB.END)}
+            onNext={() => {
+              setResults(rv => ({ ...rv, aging: rv._agingPending ?? {}, _agingPending: null }))
+              setSub(SUB.END)
+            }}
           />
         </div>
       )}
