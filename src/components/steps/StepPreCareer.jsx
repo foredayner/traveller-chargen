@@ -57,11 +57,14 @@ export default function StepPreCareer() {
   const { state, actions } = useCharacterContext()
   const [selected,     setSelected]     = useState(null)
   const [entryResult,  setEntryResult]  = useState(null)
+  const [entryPending, setEntryPending] = useState(null)  // onNext 대기용
   const [skillPicked0, setSkillPicked0] = useState('')   // 대학교 기능 레벨 0
   const [skillPicked1, setSkillPicked1] = useState('')   // 대학교 기능 레벨 1
   const [eventData,    setEventData]    = useState(null) // 사건 표 결과
+  const [eventPending, setEventPending] = useState(null) // onNext 대기용
   const [eventResolved,setEventResolved]= useState(false)
   const [gradResult,   setGradResult]   = useState(null)
+  const [gradPending,  setGradPending]  = useState(null)  // onNext 대기용
   const [careerEvents, setCareerEvents] = useState(null)
   const [phase, setPhase]              = useState('entry') // entry|skills|event|grad|done
 
@@ -190,11 +193,12 @@ export default function StepPreCareer() {
                   ].filter(b => b.value !== 0)}
                   onResult={({ values, total, success }) => {
                     const mod = sm(state.stats[option.check.stat]) - termCount
-                    setEntryResult({ roll: values[0]+values[1], mod, total, success })
+                    // entryPending에만 저장 → entryResult 건드리지 않음 → DiceRollInline 유지
+                    setEntryPending({ roll: values[0]+values[1], mod, total, success })
                   }}
                   onNext={() => {
-                    // 결과 블록 표시를 위해 dummy onNext — 다음 버튼 제공
-                    // 실제 전환은 아래 결과 블록 버튼에서 처리
+                    // 다음 버튼 클릭 → entryPending을 entryResult로 확정
+                    if (entryPending) setEntryResult(entryPending)
                   }}
                 />
               ) : (
@@ -261,8 +265,18 @@ export default function StepPreCareer() {
                 재학 중 사건 굴림을 합니다.
               </p>
               {!eventData ? (
-                <button className="btn btn-primary" onClick={rollEvent}>🎲 사건 굴림 (2D)</button>
-              ) : (
+                <DiceRollInline
+                  label="재학 중 사건 굴림"
+                  count={2} mod={0}
+                  breakdown={[]}
+                  onResult={({ values, total }) => {
+                    const evTable = careerEvents?.[selected]?.events ?? {}
+                    const ev = evTable[String(total)] ?? { text:'특별한 일이 있었습니다.', effects:[] }
+                    setEventPending({ d1: values[0], d2: values[1], total, data: ev })
+                  }}
+                  onNext={() => { if (eventPending) setEventData(eventPending) }}
+                />
+              ) : eventData ? (
                 <>
                   <div style={{
                     background:'rgba(200,168,75,0.07)',border:'1px solid var(--col-gold-dim)',
@@ -290,7 +304,7 @@ export default function StepPreCareer() {
                     </button>
                   )}
                 </>
-              )}
+              ) : null}
             </div>
           )}
 
@@ -312,11 +326,15 @@ export default function StepPreCareer() {
                   ].filter(b => b.value !== 0)}
                   onResult={({ values, total, success }) => {
                     const mod = sm(state.stats[option.gradCheck.stat])
-                    setGradResult({ roll: values[0]+values[1], mod, total, success, _pending: true })
+                    // gradPending에만 저장 → gradResult 건드리지 않음 → DiceRollInline 유지
+                    setGradPending({ roll: values[0]+values[1], mod, total, success })
                   }}
-                  onNext={() => setGradResult(prev => prev ? { ...prev, _pending: false } : prev)}
+                  onNext={() => {
+                    // 다음 버튼 클릭 → gradPending을 gradResult로 확정
+                    if (gradPending) setGradResult(gradPending)
+                  }}
                 />
-              ) : gradResult && !gradResult._pending ? (
+              ) : gradResult ? (
                 <>
                   <div className={`roll-result ${gradResult.success ? 'success' : 'failure'}`} style={{marginBottom:'0.75rem'}}>
                     <div className={`roll-total ${gradResult.success ? 'success' : 'failure'}`}>{gradResult.total}</div>

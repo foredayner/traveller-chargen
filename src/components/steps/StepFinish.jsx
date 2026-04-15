@@ -676,8 +676,9 @@ export function rollD66() {
 
 // ── 퇴직 소득 패널 ────────────────────────────────────────────
 function MusterOutPanel({ state, actions, derived, totalRolls, remaining, onNext }) {
-  const [rollType,  setRollType]  = useState(null)
-  const [rollValue, setRollValue] = useState(null)
+  const [rollType,    setRollType]    = useState(null)
+  const [rollValue,   setRollValue]   = useState(null)
+  const [rollPending, setRollPending] = useState(null)  // onNext 대기
   const usedRolls  = (state.benefits?.length??0)+(state.cashRollsUsed??0)
   const lastCareer = state.careers.at(-1)
   const careerDef  = careersData[lastCareer?.careerId]
@@ -752,7 +753,12 @@ function MusterOutPanel({ state, actions, derived, totalRolls, remaining, onNext
           {rollType && !rollValue && (
             <div>
               <div style={{marginBottom:'0.5rem',fontSize:'0.82rem',color:'var(--col-text-muted)'}}>선택: <strong style={{color:'var(--col-gold)'}}>{rollType==='cash'?'현금 열':'소득 열'}</strong></div>
-              <DiceRollInline label="소득 굴림 — 1D" count={1} sides={6} mod={0} onResult={({values})=>setTimeout(()=>setRollValue(values[0]),600)} />
+              <DiceRollInline
+                label="소득 굴림 — 1D"
+                count={1} sides={6} mod={0}
+                onResult={({values}) => setRollPending(values[0])}
+                onNext={() => { setRollValue(rollPending); setRollPending(null) }}
+              />
               <button className="btn btn-ghost" style={{marginTop:'0.5rem',fontSize:'0.75rem'}} onClick={()=>setRollType(null)}>← 뒤로</button>
             </div>
           )}
