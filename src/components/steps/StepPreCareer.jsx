@@ -191,20 +191,30 @@ export default function StepPreCareer() {
                   onResult={({ values, total, success }) => {
                     const mod = sm(state.stats[option.check.stat]) - termCount
                     setEntryResult({ roll: values[0]+values[1], mod, total, success })
-                    if (success) afterEntry(true)
                   }}
-                  onNext={null}
+                  onNext={() => {
+                    // 결과 블록 표시를 위해 dummy onNext — 다음 버튼 제공
+                    // 실제 전환은 아래 결과 블록 버튼에서 처리
+                  }}
                 />
               ) : (
-                /* 입학 실패 시만 경력 선택 버튼 표시 */
-                !entryResult.success && (
-                  <div style={{marginTop:'0.5rem'}}>
-                    <p style={{fontSize:'0.78rem',color:'var(--col-amber)',marginBottom:'0.5rem'}}>
-                      입학 실패. 이번 주기에는 경력 전교육을 받을 수 없습니다.
-                    </p>
-                    <button className="btn btn-primary" onClick={actions.skipPreCareer}>경력 선택으로 →</button>
-                  </div>
-                )
+                /* 입학 결과: 성공이면 자동 진행, 실패면 버튼 표시 */
+                entryResult.success
+                  ? (
+                    <div style={{marginTop:'0.5rem'}}>
+                      <button className="btn btn-primary" onClick={() => afterEntry(true)}>
+                        다음 — {option.skillSelect ? '기능 선택' : '사건 굴림'} →
+                      </button>
+                    </div>
+                  )
+                  : (
+                    <div style={{marginTop:'0.5rem'}}>
+                      <p style={{fontSize:'0.78rem',color:'var(--col-amber)',marginBottom:'0.5rem'}}>
+                        입학 실패. 이번 주기에는 경력 전교육을 받을 수 없습니다.
+                      </p>
+                      <button className="btn btn-primary" onClick={actions.skipPreCareer}>경력 선택으로 →</button>
+                    </div>
+                  )
               )}
             </div>
           )}
@@ -302,10 +312,11 @@ export default function StepPreCareer() {
                   ].filter(b => b.value !== 0)}
                   onResult={({ values, total, success }) => {
                     const mod = sm(state.stats[option.gradCheck.stat])
-                    setGradResult({ roll: values[0]+values[1], mod, total, success })
+                    setGradResult({ roll: values[0]+values[1], mod, total, success, _pending: true })
                   }}
+                  onNext={() => setGradResult(prev => prev ? { ...prev, _pending: false } : prev)}
                 />
-              ) : (
+              ) : gradResult && !gradResult._pending ? (
                 <>
                   <div className={`roll-result ${gradResult.success ? 'success' : 'failure'}`} style={{marginBottom:'0.75rem'}}>
                     <div className={`roll-total ${gradResult.success ? 'success' : 'failure'}`}>{gradResult.total}</div>
@@ -340,7 +351,7 @@ export default function StepPreCareer() {
                     다음 — 경력 선택 →
                   </button>
                 </>
-              )}
+              ) : null}
             </div>
           )}
         </div>

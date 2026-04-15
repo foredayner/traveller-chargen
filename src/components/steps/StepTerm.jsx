@@ -310,7 +310,10 @@ export default function StepTerm() {
                 const mishapRoll = values[0]
                 const mishapTable = careerEvents?.[state.currentCareer]?.mishaps ?? {}
                 const mishapData = mishapTable[String(mishapRoll)] ?? { text: '부상을 입습니다.', effects: [{ type: 'injury' }] }
-                setResults(r => ({ ...r, mishap: { roll: mishapRoll, data: mishapData } }))
+                setResults(r => ({ ...r, _mishapPending: { roll: mishapRoll, data: mishapData } }))
+              }}
+              onNext={() => {
+                setResults(r => ({ ...r, mishap: r._mishapPending, _mishapPending: null }))
               }}
             />
           )}
@@ -382,10 +385,17 @@ export default function StepTerm() {
                 const d1 = values[0], d2 = values[1]
                 const evTable = careerEvents?.[state.currentCareer]?.events ?? {}
                 const eventData = evTable[String(total)] ?? { text: '생활 사건이 발생합니다.', effects: [{ type: 'life_event' }] }
-                setResults(r => ({ ...r, event: { d1, d2, total, data: eventData } }))
+                // _pending으로 저장 → DiceRollInline 유지
+                setResults(r => ({ ...r, _eventPending: { d1, d2, total, data: eventData } }))
+              }}
+              onNext={() => {
+                // 다음 버튼 클릭 시 실제 event로 이동
+                setResults(r => ({ ...r, event: r._eventPending, _eventPending: null }))
               }}
             />
           )}
+          {/* 굴림 완료 전 결과 미리보기 (onNext 대기 중) */}
+          {!results.event && results._eventPending && null /* DiceRollInline이 표시 중 */}
           {results.event && (
             <>
               {/* 사건 결과 텍스트 카드 */}
@@ -749,7 +759,7 @@ function SkillTrainingPanel({ career, specialty, isFirstTerm, onDone }) {
       </p>
 
       {/* 표 선택 */}
-      {!rollResult && (
+      {(!rollResult || rollResult._pending) && (
         <>
           <div style={{ display:'flex', flexDirection:'column', gap:'0.5rem', marginBottom:'1rem' }}>
             {tables.map(t => {
@@ -794,7 +804,10 @@ function SkillTrainingPanel({ career, specialty, isFirstTerm, onDone }) {
                 const tbl = tables.find(t => t.key === tableChoice)
                 const idx = values[0] - 1
                 const raw = tbl?.skills[idx] ?? '생존'
-                setRollResult({ idx: values[0], raw, table: tbl?.label ?? '' })
+                setRollResult({ idx: values[0], raw, table: tbl?.label ?? '', _pending: true })
+              }}
+              onNext={() => {
+                setRollResult(prev => prev ? { ...prev, _pending: false } : prev)
               }}
             />
           )}
@@ -807,7 +820,7 @@ function SkillTrainingPanel({ career, specialty, isFirstTerm, onDone }) {
       )}
 
       {/* 굴림 결과 */}
-      {rollResult && (
+      {rollResult && !rollResult._pending && (
         <div>
           <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.8rem', color:'var(--col-text-muted)', marginBottom:'0.5rem' }}>
             표: {rollResult.table} · 1D: {rollResult.idx}

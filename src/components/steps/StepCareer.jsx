@@ -69,10 +69,15 @@ export default function StepCareer() {
                 const roll = values[0]
                 const careerId = DRAFT_TABLE[roll - 1]
                 const defaultSpecialty = careersData[careerId]?.specialties?.[0]?.id ?? null
-                setTimeout(() => {
-                  setDraftResult({ roll, careerId })
-                  actions.acceptDraft(careerId, defaultSpecialty)
-                }, 700)
+                setDraftResult({ roll, careerId, defaultSpecialty, _pending: true })
+              }}
+              onNext={() => {
+                setDraftResult(prev => {
+                  if (!prev) return prev
+                  const { _pending, defaultSpecialty, ...rest } = prev
+                  actions.acceptDraft(rest.careerId, defaultSpecialty)
+                  return rest
+                })
               }}
             />
           )}
@@ -82,7 +87,7 @@ export default function StepCareer() {
             </button>
           )}
         </div>
-        {draftResult && (
+        {draftResult && !draftResult._pending && (
           <div style={{
             padding:'1rem', marginTop:'0.75rem',
             background:'rgba(224,82,82,0.07)',
@@ -311,7 +316,7 @@ export default function StepCareer() {
               return <span style={{marginLeft:'0.5rem',color:'var(--col-green)',fontSize:'0.72rem',fontFamily:'var(--font-mono)'}}>✓ 자격 자동 성공 ({schoolNames[state.preCareer] ?? '사관학교'} 졸업)</span>
             })()}
             </div>
-            {!qualResult ? (
+            {(!qualResult || qualResult._pending) ? (
               autoQualThisTerm ? (
                 <div>
                   <p style={{fontSize:'0.82rem',color:'var(--col-green)',marginBottom:'0.5rem'}}>
@@ -360,10 +365,14 @@ export default function StepCareer() {
                     ...(eventDm > 0 ? [{ label:'사건 DM', value: eventDm }] : []),
                   ].filter(b => b.value !== 0)}
                   onResult={({ values, total, success }) => {
-                    setQualResult({ total, success })
+                    // _pending에 저장 → DiceRollInline 유지 (언마운트 방지)
+                    setQualResult({ _pending: true, total, success })
                     actions.resolveQualRoll(success)
                     if (gradDm > 0) actions.markGradBenefitUsed('qualDm')
                     if (eventDm > 0) actions.clearNextQualDm()
+                  }}
+                  onNext={() => {
+                    setQualResult(prev => prev ? { ...prev, _pending: false } : prev)
                   }}
                 />
                 </div>

@@ -717,7 +717,8 @@ function StatChoiceEffect({ effect, state, actions, onDone }) {
 
 // ── 판정: check / check_or_injury ────────────────────────────
 function CheckEffect({ effect, state, actions, onDone }) {
-  const [result, setResult] = useState(null)
+  const [result, setResult]       = useState(null)
+  const [pending, setPending]     = useState(null)   // onNext 대기
   const [subEffectDone, setSubEffectDone] = useState(false)
 
   // 판정할 특성치 또는 기능 결정
@@ -752,7 +753,7 @@ function CheckEffect({ effect, state, actions, onDone }) {
     : (effect.failure ?? [])
 
   // 결과가 있고 후속 효과가 없으면 즉시 완료
-  if (result && afterEffects.length === 0 && !subEffectDone) {
+  if (result && !pending && afterEffects.length === 0 && !subEffectDone) {
     return (
       <div>
         <RollResultDisplay result={result} label={getCheckLabel()} />
@@ -765,7 +766,7 @@ function CheckEffect({ effect, state, actions, onDone }) {
     )
   }
 
-  if (result && !subEffectDone) {
+  if (result && !pending && !subEffectDone) {
     return (
       <div>
         <RollResultDisplay result={result} label={getCheckLabel()} />
@@ -814,7 +815,11 @@ function CheckEffect({ effect, state, actions, onDone }) {
         target={effect.target}
         breakdown={getDm() !== 0 ? [{ label:'수정치', value: getDm() }] : []}
         onResult={({ values, total, success }) => {
-          setResult({ roll: values[0]+(values[1]??0), mod: getDm(), total, success })
+          setPending({ roll: values[0]+(values[1]??0), mod: getDm(), total, success })
+        }}
+        onNext={() => {
+          setResult(pending)
+          setPending(null)
         }}
       />
     </div>
@@ -823,17 +828,17 @@ function CheckEffect({ effect, state, actions, onDone }) {
 
 // ── 판정: specialty_check (직종별 자동 기능 판정) ────────────
 function SpecialtyCheckEffect({ effect, state, actions, onDone }) {
-  const [result, setResult] = useState(null)
+  const [result,  setResult]  = useState(null)
+  const [pending, setPending] = useState(null)
 
-  const doRoll = () => {
-    // 직종에 따라 자동으로 기능 선택
-    const r = checkStat(state.stats.int ?? 7, effect.target)
-    setResult(r)
+  const getDm = () => {
+    const MOD = [-3,-2,-2,-1,-1,-1,0,0,0,1,1,1,2,2,2,3]
+    return MOD[Math.min(15, Math.max(0, state.stats.int ?? 0))] ?? 0
   }
 
   const afterEffects = result?.success ? (effect.success ?? []) : (effect.failure ?? [])
 
-  if (result && afterEffects.length === 0) {
+  if (result && !pending && afterEffects.length === 0) {
     return (
       <div>
         <RollResultDisplay result={result} label={`직종 판정 ${effect.target}+`} />
@@ -844,7 +849,7 @@ function SpecialtyCheckEffect({ effect, state, actions, onDone }) {
     )
   }
 
-  if (result) {
+  if (result && !pending) {
     return (
       <div>
         <RollResultDisplay result={result} label={`직종 판정 ${effect.target}+`} />
@@ -863,7 +868,18 @@ function SpecialtyCheckEffect({ effect, state, actions, onDone }) {
   return (
     <div className="card" style={{ marginBottom:'0.75rem' }}>
       <div className="card-title" style={{ fontSize:'0.85rem' }}>직종 판정 — {effect.target}+</div>
-      <button className="btn btn-primary" onClick={doRoll}>🎲 굴리기</button>
+      <DiceRollInline
+        label={`직종 판정 — 지능 ${effect.target}+`}
+        stat="지능"
+        count={2}
+        mod={getDm()}
+        target={effect.target}
+        breakdown={getDm() !== 0 ? [{ label:'지능 수정치', value: getDm() }] : []}
+        onResult={({ values, total, success }) => {
+          setPending({ roll: values[0]+(values[1]??0), mod: getDm(), total, success })
+        }}
+        onNext={() => { setResult(pending); setPending(null) }}
+      />
     </div>
   )
 }
@@ -886,7 +902,7 @@ function InjuryEffect({ effect, state, actions, onDone }) {
     setRollResult(res)
   }
 
-  if (rollResult) {
+  if (rollResult && !rollResult._pending) {
     const entry = injuryTable[rollResult.roll]
     if (!entry) return <SimpleNarrativeEffect text="부상 표 결과 불명확" onDone={() => onDone({ tag:'부상', text:'불명확', kind:'loss' })} />
 
@@ -940,16 +956,20 @@ function InjuryEffect({ effect, state, actions, onDone }) {
               breakdown={[]}
               onResult={({ values }) => {
                 const cost = values[0] * 10000
+                setMedDebt(-cost)  // 음수로 pending 표시
+              }}
+              onNext={() => {
+                const cost = -medDebt  // 음수 → 양수
                 setMedDebt(cost)
                 actions.applyMedicalDebt?.(cost)
               }}
             />
           </div>
-        ) : (
+        ) : medDebt > 0 ? (
           <div>
             <p style={{fontSize:'0.82rem',color:'var(--col-amber)',marginBottom:'0.75rem'}}>
               의료비 Cr {medDebt.toLocaleString()} —{' '}
-              {(state.cash ?? 0) + medDebt >= medDebt
+              {(state.cash ?? 0) >= medDebt
                 ? '현금으로 지불됩니다.'
                 : `현금 부족. 채무 Cr ${(medDebt - Math.min(state.cash ?? 0, medDebt)).toLocaleString()} 발생.`}
             </p>
@@ -957,7 +977,7 @@ function InjuryEffect({ effect, state, actions, onDone }) {
               onClick={() => onDone({ tag:'부상', text: entry.name, kind:'loss' })}
             >확인</button>
           </div>
-        )}
+        ) : null}
       </div>
     )
   }
@@ -978,8 +998,9 @@ function InjuryEffect({ effect, state, actions, onDone }) {
           let roll = values[0]
           if (isSevere) roll = Math.min(roll, Math.floor(Math.random()*6)+1)
           if (isHigh)   roll = Math.max(roll, Math.floor(Math.random()*6)+1)
-          setTimeout(() => setRollResult({ roll, rolls: [roll] }), 600)
+          setRollResult({ roll, rolls: [roll], _pending: true })
         }}
+        onNext={() => setRollResult(prev => prev ? { roll: prev.roll, rolls: prev.rolls } : prev)}
       />
     </div>
   )
@@ -1031,28 +1052,30 @@ function InjuryStatMinus({ effect, state, actions, onDone }) {
 }
 
 function InjuryStatMinus1D({ state, actions, onDone }) {
-  const [rolled, setRolled] = useState(null)
+  const [rolledVal, setRolledVal] = useState(null)   // 확정된 숫자
+  const [pending,   setPending]   = useState(false)   // 주사위 굴림 후 onNext 대기
   const [picked, setPicked] = useState(null)
-  if (picked && rolled) {
+
+  if (picked && rolledVal) {
     return (
       <button className="btn btn-ghost"
-        onClick={() => onDone({ tag:'부상', text:`${STAT_NAME_KO[picked]} -${rolled}`, kind:'loss' })}>
+        onClick={() => onDone({ tag:'부상', text:`${STAT_NAME_KO[picked]} -${rolledVal}`, kind:'loss' })}>
         확인
       </button>
     )
   }
-  if (rolled && !picked) {
+  if (rolledVal && !picked) {
     return (
       <div className="card" style={{ marginBottom:'0.5rem' }}>
         <div className="card-title" style={{ fontSize:'0.8rem', color:'var(--col-red)' }}>
-          신체 특성치 -{rolled} (1D 결과) — 선택
+          신체 특성치 -{rolledVal} (1D 결과) — 선택
         </div>
         <div className="choice-group">
           {PHYSICAL_STATS.map(s => (
             <button key={s} className="btn btn-danger" style={{ fontSize:'0.78rem' }}
-              onClick={() => { actions.applyStatChange(s, -rolled); setPicked(s) }}
+              onClick={() => { actions.applyStatChange(s, -rolledVal); setPicked(s) }}
             >
-              {STAT_NAME_KO[s]} ({state.stats[s] ?? 0} → {Math.max(0,(state.stats[s]??0)-rolled)})
+              {STAT_NAME_KO[s]} ({state.stats[s] ?? 0} → {Math.max(0,(state.stats[s]??0)-rolledVal)})
             </button>
           ))}
         </div>
@@ -1065,39 +1088,42 @@ function InjuryStatMinus1D({ state, actions, onDone }) {
         신체 특성치 1D만큼 감소
       </div>
       <DiceRollInline label="부상 — 1D" count={1} sides={6} mod={0} variant="danger"
-        onResult={({ values }) => setTimeout(() => setRolled(values[0]), 500)} />
+        onResult={({ values }) => setPending(values[0])}
+        onNext={() => { setRolledVal(pending); setPending(false) }}
+      />
     </div>
   )
 }
 // ── 생활 사건 표 ─────────────────────────────────────────────
 function LifeEventEffect({ state, actions, onDone }) {
-  const [roll, setRoll] = useState(null)
-  const [subDone, setSubDone] = useState(false)
+  const [rollVal,  setRollVal]  = useState(null)   // 확정된 굴림값
+  const [pending,  setPending]  = useState(null)   // onNext 대기 중 임시값
+  const [subDone,  setSubDone]  = useState(false)
 
-  const doRoll = () => setRoll(roll2D())
-
-  if (roll) {
-    const entry = lifeEvents[roll] ?? { name: '???', text: '특이한 일이 일어납니다.', effects: [] }
+  if (rollVal) {
+    const entry = lifeEvents[rollVal] ?? { name: '???', text: '특이한 일이 일어납니다.', effects: [] }
     const subEffects = entry.effects ?? []
 
     if (subEffects.length === 0 || subDone) {
       return (
         <div>
           <div className="event-card" style={{ borderLeftColor:'var(--col-cyan)', background:'rgba(79,195,212,0.05)', marginBottom:'0.75rem' }}>
-            <div className="event-roll-label">생활 사건 2D: {roll} — {entry.name}</div>
+            <div className="event-roll-label">생활 사건 2D: {rollVal} — {entry.name}</div>
             <div className="event-text">{entry.text}</div>
           </div>
-          <button className="btn btn-primary" onClick={() => onDone({ tag:'생활사건', text: entry.name, kind:'neutral' })}>
-            확인
-          </button>
+          {!subDone && (
+            <button className="btn btn-primary" onClick={() => setSubDone(true)}>확인</button>
+          )}
+          {subDone && (
+            <button className="btn btn-ghost" onClick={() => onDone({ tag:'생활사건', text: entry.name, kind:'neutral' })}>완료</button>
+          )}
         </div>
       )
     }
-
     return (
       <div>
         <div className="event-card" style={{ borderLeftColor:'var(--col-cyan)', background:'rgba(79,195,212,0.05)', marginBottom:'0.75rem' }}>
-          <div className="event-roll-label">생활 사건 2D: {roll} — {entry.name}</div>
+          <div className="event-roll-label">생활 사건 2D: {rollVal} — {entry.name}</div>
           <div className="event-text">{entry.text}</div>
         </div>
         {subEffects.map((e, i) => (
@@ -1121,23 +1147,23 @@ function LifeEventEffect({ state, actions, onDone }) {
         label="생활 사건 굴림"
         count={2} mod={0}
         breakdown={[]}
-        onResult={({ total }) => setTimeout(() => setRoll(total), 600)}
+        onResult={({ total }) => setPending(total)}
+        onNext={() => { setRollVal(pending); setPending(null) }}
       />
     </div>
   )
-}
-
-// ── 기이한 사건 (1D 서브표) ───────────────────────────────────
+}// ── 기이한 사건 (1D 서브표) ───────────────────────────────────
 function WeirdEventEffect({ state, actions, onDone }) {
-  const [roll, setRoll] = useState(null)
+  const [rollVal, setRollVal] = useState(null)
+  const [pending, setPending] = useState(null)
 
   const subTable = {
     1: '초능력자 단체와 연이 닿습니다. GM과 상의하세요.',
-    2: '외계 종족 사이에서 시간을 보냅니다. 학문 +1, 외계 연줄 획득.',
-    3: '기묘한 외계 장치를 얻습니다.',
-    4: '무슨 일이 일어났는지 기억이 나지 않습니다.',
-    5: '제국의 최상층부와 잠시 접촉하게 됩니다.',
-    6: '인류보다도 오래된 고대 기술을 얻습니다.',
+    2: '외계 종족과 접촉합니다. 학문 기능 +1, 연줄(외계 종족) 획득.',
+    3: '이상한 꿈을 꾸기 시작합니다. GM과 상의하세요.',
+    4: '유물 또는 고대 기술을 발견합니다. GM과 상의하세요.',
+    5: '평범하지 않은 사건이 일어납니다. GM과 상의하세요.',
+    6: '불가사의한 현상을 목격합니다. GM과 상의하세요.',
   }
 
   const apply = (r) => {
@@ -1148,12 +1174,12 @@ function WeirdEventEffect({ state, actions, onDone }) {
     onDone({ tag:'기이한사건', text: subTable[r], kind:'neutral' })
   }
 
-  if (roll) {
+  if (rollVal) {
     return (
       <div className="event-card" style={{ borderLeftColor:'var(--col-gold)', marginBottom:'0.75rem' }}>
-        <div className="event-roll-label">기이한 사건 1D: {roll}</div>
-        <div className="event-text">{subTable[roll]}</div>
-        <button className="btn btn-primary" style={{ marginTop:'0.5rem' }} onClick={() => apply(roll)}>확인</button>
+        <div className="event-roll-label">기이한 사건 1D: {rollVal}</div>
+        <div className="event-text">{subTable[rollVal]}</div>
+        <button className="btn btn-primary" style={{ marginTop:'0.5rem' }} onClick={() => apply(rollVal)}>확인</button>
       </div>
     )
   }
@@ -1164,7 +1190,8 @@ function WeirdEventEffect({ state, actions, onDone }) {
       <DiceRollInline
         label="기이한 사건 — 1D"
         count={1} sides={6} mod={0}
-        onResult={({ values }) => setTimeout(() => setRoll(values[0]), 600)}
+        onResult={({ values }) => setPending(values[0])}
+        onNext={() => { setRollVal(pending); setPending(null) }}
       />
     </div>
   )
@@ -1172,15 +1199,16 @@ function WeirdEventEffect({ state, actions, onDone }) {
 
 // ── 사고 (경력 종료 없음) ─────────────────────────────────────
 function MishapNoEndEffect({ state, actions, onDone }) {
-  const [roll, setRoll] = useState(null)
+  const [rollVal, setRollVal] = useState(null)
+  const [pending, setPending] = useState(null)
 
-  if (roll) {
+  if (rollVal) {
     return (
       <div className="event-card mishap" style={{ marginBottom:'0.75rem' }}>
-        <div className="event-roll-label">⚠ 사고 굴림 1D: {roll} (경력 유지)</div>
+        <div className="event-roll-label">⚠ 사고 굴림 1D: {rollVal} (경력 유지)</div>
         <div className="event-text">사고 결과가 적용됩니다. 경력은 계속됩니다.</div>
         <button className="btn btn-primary" style={{ marginTop:'0.5rem' }}
-          onClick={() => onDone({ tag:'사고', text:`사고 ${roll} (경력 유지)`, kind:'loss' })}
+          onClick={() => onDone({ tag:'사고', text:`사고 ${rollVal} (경력 유지)`, kind:'loss' })}
         >확인</button>
       </div>
     )
@@ -1193,7 +1221,8 @@ function MishapNoEndEffect({ state, actions, onDone }) {
         label="사고 표 — 1D (경력 유지)"
         count={1} sides={6} mod={0}
         variant="danger"
-        onResult={({ values }) => setTimeout(() => setRoll(values[0]), 600)}
+        onResult={({ values }) => setPending(values[0])}
+        onNext={() => { setRollVal(pending); setPending(null) }}
       />
     </div>
   )

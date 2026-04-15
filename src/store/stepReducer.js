@@ -635,7 +635,12 @@ export function characterReducer(state, action) {
     }
 
     case A.LOAD_STATE: {
-      return { ...INITIAL_STATE, ...action.state }
+      const loaded = { ...INITIAL_STATE, ...action.state }
+      // baseStats 없는 구버전 데이터 호환: stats로 폴백
+      if (!action.state.baseStats || Object.values(action.state.baseStats).every(v => v === 0)) {
+        loaded.baseStats = { ...loaded.stats }
+      }
+      return loaded
     }
 
     case A.RESET: {
