@@ -20,7 +20,8 @@ const DRAFT_DESC = {
 
 export default function StepCareer() {
   const { state, actions } = useCharacterContext()
-  const [qualResult, setQualResult] = useState(null)
+  const [qualResult,  setQualResult]  = useState(null)
+  const [qualPending, setQualPending] = useState(null)  // onNext 대기용
   const [showDraft, setShowDraft] = useState(false)
   const [draftResult, setDraftResult] = useState(null)
 
@@ -316,7 +317,7 @@ export default function StepCareer() {
               return <span style={{marginLeft:'0.5rem',color:'var(--col-green)',fontSize:'0.72rem',fontFamily:'var(--font-mono)'}}>✓ 자격 자동 성공 ({schoolNames[state.preCareer] ?? '사관학교'} 졸업)</span>
             })()}
             </div>
-            {(!qualResult || qualResult._pending) ? (
+            {!qualResult ? (
               autoQualThisTerm ? (
                 <div>
                   <p style={{fontSize:'0.82rem',color:'var(--col-green)',marginBottom:'0.5rem'}}>
@@ -365,14 +366,14 @@ export default function StepCareer() {
                     ...(eventDm > 0 ? [{ label:'사건 DM', value: eventDm }] : []),
                   ].filter(b => b.value !== 0)}
                   onResult={({ values, total, success }) => {
-                    // _pending에 저장 → DiceRollInline 유지 (언마운트 방지)
-                    setQualResult({ _pending: true, total, success })
-                    actions.resolveQualRoll(success)
-                    if (gradDm > 0) actions.markGradBenefitUsed('qualDm')
-                    if (eventDm > 0) actions.clearNextQualDm()
+                    setQualPending({ total, success })
                   }}
                   onNext={() => {
-                    setQualResult(prev => prev ? { ...prev, _pending: false } : prev)
+                    if (!qualPending) return
+                    setQualResult(qualPending)
+                    actions.resolveQualRoll(qualPending.success)
+                    if (gradDm > 0) actions.markGradBenefitUsed('qualDm')
+                    if (eventDm > 0) actions.clearNextQualDm()
                   }}
                 />
                 </div>
