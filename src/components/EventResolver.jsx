@@ -48,33 +48,38 @@ const CONTACT_LABELS = { ally:'조력자', contact:'연줄', rival:'경쟁자', 
 // ─────────────────────────────────────────────────────────────
 export default function EventResolver({ eventData, isMishap = false, onResolved }) {
   const { state, actions } = useCharacterContext()
-  // pendingEffects: 아직 처리되지 않은 effects 큐
   const [queue, setQueue]       = useState(() => [...(eventData?.effects ?? [])])
-  const [resolved, setResolved] = useState([])   // 처리 완료된 효과 로그
+  const [resolved, setResolved] = useState([])
   const [done, setDone]         = useState(false)
+  const resolvedRef             = useRef([])  // 항상 최신 resolved 유지
 
-  // 현재 처리할 effect
   const current = queue[0] ?? null
 
-  // ── 효과 처리 완료 → 큐에서 제거 + 로그 추가 ──────────────
   const advance = useCallback((logEntry = null, extraQueue = []) => {
-    setQueue(q => {
-      const next = [...extraQueue, ...q.slice(1)]
-      return next
-    })
-    if (logEntry) setResolved(r => [...r, logEntry])
+    setQueue(q => [...extraQueue, ...q.slice(1)])
+    if (logEntry) {
+      setResolved(r => {
+        const next = [...r, logEntry]
+        resolvedRef.current = next  // ref도 동기 업데이트
+        return next
+      })
+    }
   }, [])
 
-  // 큐가 비었을 때
-  const handleAllDone = useCallback(() => {
-    setDone(true)
-    onResolved?.(resolved)
-  }, [onResolved, resolved])
+  // 빈 큐 감지 — useEffect로 렌더 중 state 업데이트 방지
+  useEffect(() => {
+    if (!done && queue.length === 0) {
+      setDone(true)
+    }
+  }, [done, queue.length])
 
-  // 빈 큐 감지
-  if (!done && queue.length === 0) {
-    handleAllDone()
-  }
+  // done이 true가 된 후 onResolved 호출 (ref로 최신 resolved 보장)
+  useEffect(() => {
+    if (done) {
+      onResolved?.(resolvedRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done])
 
   // ─── 렌더: 완료 상태 ────────────────────────────────────────
   if (done) {
