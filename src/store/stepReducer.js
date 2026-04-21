@@ -66,6 +66,8 @@ export const INITIAL_STATE = {
   preCareerAttempted: false, // 이번 주기에 입학을 시도했는지
 
   // 졸업 혜택 플래그 (경력 선택에서 소비됨)
+  pendingAutoCommission: false, // 사건으로 받은 임관 자동 성공 플래그
+
   gradBenefits: {
     qualDm: 0,              // 자격 굴림 수정치 (+1 보통, +2 우등)
     qualEligible: [],       // DM 적용 가능한 경력 id 목록
@@ -179,9 +181,17 @@ export const A = {
   // Step 5: 경력 주기
   RESOLVE_BASIC_TRAINING: 'RESOLVE_BASIC_TRAINING', // { skills }
   CLEAR_NEXT_QUAL_DM:  'CLEAR_NEXT_QUAL_DM',
+  SET_NEXT_QUAL_DM:    'SET_NEXT_QUAL_DM',
+  SET_PENDING_NEXT_DRAFT: 'SET_PENDING_NEXT_DRAFT',
+  SET_PENDING_PRISONER:   'SET_PENDING_PRISONER',
   APPLY_MEDICAL_DEBT:  'APPLY_MEDICAL_DEBT',
   MARK_GRAD_BENEFIT_USED: 'MARK_GRAD_BENEFIT_USED',
-  SET_STAT_ADJUSTMENT: 'SET_STAT_ADJUSTMENT',   // { stat, value }
+  EXTRA_MUSTER:              'EXTRA_MUSTER',
+  LOSE_MUSTER:               'LOSE_MUSTER',        // { count }
+  SET_ADVANCEMENT_DM:        'SET_ADVANCEMENT_DM',
+  SET_PENDING_AUTO_COMMISSION: 'SET_PENDING_AUTO_COMMISSION',
+  SET_STAT_ADJUSTMENT: 'SET_STAT_ADJUSTMENT',
+  SET_EVENT_COMMISSION_BONUS: 'SET_EVENT_COMMISSION_BONUS', // 사건으로 임관 자동 성공   // { stat, value }
   SET_PORTRAIT:        'SET_PORTRAIT',           // { dataUrl }
   SET_PSIONIC:         'SET_PSIONIC',            // { strength, talents }
   RESOLVE_SURVIVAL:    'RESOLVE_SURVIVAL',  // { roll, success }
@@ -436,6 +446,15 @@ export function characterReducer(state, action) {
     case A.CLEAR_NEXT_QUAL_DM:
       return { ...state, _nextQualDm: 0 }
 
+    case A.SET_NEXT_QUAL_DM:
+      return { ...state, _nextQualDm: (state._nextQualDm ?? 0) + (action.value ?? 1) }
+
+    case A.SET_PENDING_NEXT_DRAFT:
+      return { ...state, pendingNextDraft: action.value }
+
+    case A.SET_PENDING_PRISONER:
+      return { ...state, pendingPrisoner: action.value }
+
     case A.APPLY_MEDICAL_DEBT: {
       const cost = action.amount
       const canPay = (state.cash ?? 0) >= cost
@@ -446,10 +465,33 @@ export function characterReducer(state, action) {
 
     case A.SET_STAT_ADJUSTMENT: {
       const adj = { ...(state.statAdjustments ?? {}), [action.stat]: action.value }
-      // stats = baseStats + 경력 변화 누적 + 수동 조정
-      // 수동 조정은 최종 stats에 반영 (별도 추적)
       return { ...state, statAdjustments: adj }
     }
+
+    case A.SET_EVENT_COMMISSION_BONUS: {
+      // 사건으로 다음 임관 굴림 자동 성공 플래그
+      return {
+        ...state,
+        gradBenefits: {
+          ...state.gradBenefits,
+          canCommission: true,
+          commissionDm: 99,   // 99 = 자동 성공
+          autoCommission: true,
+        }
+      }
+    }
+
+    case A.EXTRA_MUSTER:
+      return { ...state, cashRolls: (state.cashRolls ?? 1) + 1 }
+
+    case A.LOSE_MUSTER:
+      return { ...state, cashRolls: Math.max(0, (state.cashRolls ?? 1) - (action.count ?? 1)) }
+
+    case A.SET_ADVANCEMENT_DM:
+      return { ...state, _advancementDm: (state._advancementDm ?? 0) + action.value }
+
+    case A.SET_PENDING_AUTO_COMMISSION:
+      return { ...state, pendingAutoCommission: action.value }
 
     case A.SET_PORTRAIT:
       return { ...state, portrait: action.dataUrl }

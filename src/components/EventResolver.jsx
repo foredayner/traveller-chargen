@@ -206,8 +206,8 @@ function EffectHandler({ effect, state, actions, isMishap, onDone }) {
       return <AutoSkillEffect effect={effect} actions={actions} onDone={onDone} />
 
     case 'advancement_dm':
-      return <AutoFlagEffect effect={effect} label="진급 DM" tag="진급" actions={actions} onDone={onDone}
-        apply={() => actions.dispatch?.({ type: 'SET_ADVANCEMENT_DM', value: effect.value })} />
+      return <AutoFlagEffect effect={effect} label={`진급 DM +${effect.value}`} tag="진급DM" actions={actions} onDone={onDone}
+        apply={() => actions.setAdvancementDm?.(effect.value)} />
 
     case 'keep_career':
     case 'next_qualification_dm':
@@ -224,6 +224,7 @@ function EffectHandler({ effect, state, actions, isMishap, onDone }) {
     case 'honorable_discharge':
     case 'dishonorable_discharge':
     case 'maybe_prisoner':
+      return <MaybePrisonerEffect state={state} actions={actions} onDone={onDone} />
     case 'enemy_if_none':
     case 'contact_to_rival_or_new_enemy':
     case 'alien_contact':
@@ -232,8 +233,9 @@ function EffectHandler({ effect, state, actions, isMishap, onDone }) {
     case 'ancient_tech':
     case 'psion_test':
     case 'auto_advance':
-    case 'auto_advance_or_commission':
       return <AutoNarrativeEffect effect={effect} state={state} actions={actions} onDone={onDone} />
+    case 'auto_advance_or_commission':
+      return <AutoAdvanceOrCommissionEffect effect={effect} state={state} actions={actions} onDone={onDone} />
 
     // ── 플레이어 선택 필요 ─────────────────────────────────────
     case 'choice':
@@ -470,6 +472,106 @@ function AutoFlagEffect({ effect, label, tag, actions, apply, onDone }) {
 }
 
 // ── 자동: 서사적 효과 (텍스트만) ────────────────────────────
+// ── 자동 진급 또는 임관 선택 ─────────────────────────────────
+function AutoAdvanceOrCommissionEffect({ effect, state, actions, onDone }) {
+  const isOfficer = state.currentIsOfficer
+
+  // 이미 장교라면 선택지 없이 자동 진급
+  if (isOfficer) {
+    return (
+      <ConfirmCard
+        label="전투에서 영웅적인 활약! 자동으로 진급합니다."
+        color="var(--col-green)"
+        detail="이미 장교이므로 진급이 적용됩니다."
+        onConfirm={() => onDone({ tag:'진급', text:'자동 진급 (영웅적 활약)', kind:'success' })}
+      />
+    )
+  }
+
+  // 사병이라면 선택: 자동 진급 or 임관 보너스
+  return (
+    <div className="card" style={{ marginBottom:'0.75rem', borderColor:'var(--col-green)' }}>
+      <div className="card-title" style={{ fontSize:'0.85rem', color:'var(--col-green)' }}>
+        영웅적 활약 — 선택
+      </div>
+      <p style={{ fontSize:'0.82rem', color:'var(--col-text-muted)', marginBottom:'0.75rem' }}>
+        이번 활약으로 자동으로 <strong>진급</strong>하거나, 다음 임관 굴림에서 <strong>자동 성공</strong>할 수 있습니다.
+      </p>
+      <div className="choice-group">
+        <button
+          className="btn btn-primary"
+          onClick={() => onDone({ tag:'진급', text:'자동 진급 (영웅적 활약)', kind:'success' })}
+        >
+          ✦ 자동 진급
+        </button>
+        <button
+          className="btn"
+          style={{ borderColor:'var(--col-cyan)', color:'var(--col-cyan)' }}
+          onClick={() => {
+            // 임관 자동 성공 플래그 설정 → 다음 임관 굴림에서 사용
+            actions.setPendingAutoCommission?.(true)
+            onDone({ tag:'임관보너스', text:'다음 임관 굴림 자동 성공', kind:'success' })
+          }}
+        >
+          ★ 임관 자동 성공 (다음 임관 굴림)
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── 죄수 경력 위험 (2D=2이면 죄수) ──────────────────────────
+function MaybePrisonerEffect({ state, actions, onDone }) {
+  const [roll, setRoll]   = useState(null)
+  const [pending, setPending] = useState(null)
+  const pendingRef = useRef(null)
+
+  if (roll !== null) {
+    const isPrisoner = roll === 2
+    return (
+      <div className="card" style={{ marginBottom:'0.75rem', borderColor: isPrisoner ? 'var(--col-red)' : 'var(--col-text-muted)' }}>
+        <div className="card-title" style={{ fontSize:'0.85rem', color: isPrisoner ? 'var(--col-red)' : 'var(--col-text-muted)' }}>
+          {isPrisoner ? '⚠ 2D 결과: 2 — 다음 주기 죄수 경력!' : `2D 결과: ${roll} — 무사합니다.`}
+        </div>
+        <p style={{ fontSize:'0.82rem', color:'var(--col-text-muted)', marginBottom:'0.75rem' }}>
+          {isPrisoner ? '다음 주기는 죄수 경력으로 시작합니다.' : '2가 나오지 않아 안전합니다.'}
+        </p>
+        <button className="btn btn-primary"
+          onClick={() => {
+            if (isPrisoner) actions.setPendingPrisoner?.(true)
+            onDone({ tag:'위험', text: isPrisoner ? '죄수 경력 강제' : '위험 회피', kind: isPrisoner ? 'loss' : 'neutral' })
+          }}
+        >확인</button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="card" style={{ marginBottom:'0.75rem', borderColor:'var(--col-amber)' }}>
+      <div className="card-title" style={{ fontSize:'0.85rem', color:'var(--col-amber)' }}>위험 — 2D 굴림</div>
+      <p style={{ fontSize:'0.82rem', color:'var(--col-text-muted)', marginBottom:'0.75rem' }}>
+        2D를 굴립니다. <strong>2가 나오면</strong> 다음 주기에 죄수 경력을 시작합니다.
+      </p>
+      <DiceRollInline
+        label="위험 판정 — 2D"
+        count={2} mod={0}
+        breakdown={[]}
+        onResult={({ total }) => {
+          pendingRef.current = total
+          setPending(total)
+          if (total === 2) actions.setPendingPrisoner?.(true)  // 죄수 경력 플래그 세팅
+        }}
+        onNext={() => {
+          const t = pendingRef.current
+          setRoll(t)
+          setPending(null)
+        }}
+      />
+    </div>
+  )
+}
+
+
 function AutoNarrativeEffect({ effect, state, actions, onDone }) {
   const narratives = {
     next_term_prisoner:       { tag:'경력', text:'다음 주기 죄수 경력으로 시작합니다.', kind:'loss' },
@@ -509,11 +611,24 @@ function AutoNarrativeEffect({ effect, state, actions, onDone }) {
     if (effect.type === 'alien_contact') {
       actions.addContact('contact', '외계 종족')
     }
-    // 불명예 제대: 이번 주기 소득 굴림 횟수를 0으로 (reducer에서 처리)
-    // → StepTerm onResolved에서 end_career=true로 처리되므로 여기선 플래그만
+    if (effect.type === 'lose_muster_roll') {
+      actions.loseMuster?.(effect.count ?? 1)
+    }
+    if (effect.type === 'lose_all_muster') {
+      // cashRolls를 0으로 — 현재 cashRolls 전체 차감
+      actions.loseMuster?.(state.cashRolls ?? 1)
+    }
+    if (effect.type === 'extra_muster_roll') {
+      actions.addExtraMuster?.()
+    }
+    if (effect.type === 'next_qualification_dm') {
+      actions.setNextQualDm?.(effect.value ?? 1)
+    }
+    if (effect.type === 'next_term_draft') {
+      actions.setPendingNextDraft?.(true)
+    }
     if (effect.type === 'dishonorable_discharge') {
       // cashRollsUsed를 3으로 만들어 현금 추가 굴림 막기는 reducer에서 처리
-      // 여기서는 서사 텍스트만 표시
     }
     onDone(entry)
   }
@@ -719,6 +834,7 @@ function StatChoiceEffect({ effect, state, actions, onDone }) {
 function CheckEffect({ effect, state, actions, onDone }) {
   const [result, setResult]       = useState(null)
   const [pending, setPending]     = useState(null)   // onNext 대기
+  const pendingRef                = useRef(null)      // stale closure 방지
   const [subEffectDone, setSubEffectDone] = useState(false)
 
   // 판정할 특성치 또는 기능 결정
@@ -815,11 +931,15 @@ function CheckEffect({ effect, state, actions, onDone }) {
         target={effect.target}
         breakdown={getDm() !== 0 ? [{ label:'수정치', value: getDm() }] : []}
         onResult={({ values, total, success }) => {
-          setPending({ roll: values[0]+(values[1]??0), mod: getDm(), total, success })
+          const p = { roll: values[0]+(values[1]??0), mod: getDm(), total, success }
+          pendingRef.current = p
+          setPending(p)
         }}
         onNext={() => {
-          setResult(pending)
+          const p = pendingRef.current
+          setResult(p)
           setPending(null)
+          pendingRef.current = null
         }}
       />
     </div>
@@ -830,6 +950,7 @@ function CheckEffect({ effect, state, actions, onDone }) {
 function SpecialtyCheckEffect({ effect, state, actions, onDone }) {
   const [result,  setResult]  = useState(null)
   const [pending, setPending] = useState(null)
+  const pendingRef            = useRef(null)  // stale closure 방지
 
   const getDm = () => {
     const MOD = [-3,-2,-2,-1,-1,-1,0,0,0,1,1,1,2,2,2,3]
@@ -876,9 +997,14 @@ function SpecialtyCheckEffect({ effect, state, actions, onDone }) {
         target={effect.target}
         breakdown={getDm() !== 0 ? [{ label:'지능 수정치', value: getDm() }] : []}
         onResult={({ values, total, success }) => {
-          setPending({ roll: values[0]+(values[1]??0), mod: getDm(), total, success })
+          const p = { roll: values[0]+(values[1]??0), mod: getDm(), total, success }
+          pendingRef.current = p
+          setPending(p)
         }}
-        onNext={() => { setResult(pending); setPending(null) }}
+        onNext={() => {
+          const p = pendingRef.current
+          setResult(p); setPending(null); pendingRef.current = null
+        }}
       />
     </div>
   )
@@ -889,6 +1015,7 @@ function InjuryEffect({ effect, state, actions, onDone }) {
   const [rollResult, setRollResult] = useState(null)
   const [subDone, setSubDone] = useState(false)
   const [medDebt, setMedDebt] = useState(null)  // null=미처리, 숫자=의료비
+  const medDebtPendingRef = useRef(null)
 
   const isSevere = effect.severity === 'severe'
   const isHigh   = effect.severity === 'severe_high'  // 높은 값 선택
@@ -956,10 +1083,11 @@ function InjuryEffect({ effect, state, actions, onDone }) {
               breakdown={[]}
               onResult={({ values }) => {
                 const cost = values[0] * 10000
+                medDebtPendingRef.current = cost
                 setMedDebt(-cost)  // 음수로 pending 표시
               }}
               onNext={() => {
-                const cost = -medDebt  // 음수 → 양수
+                const cost = medDebtPendingRef.current ?? 0
                 setMedDebt(cost)
                 actions.applyMedicalDebt?.(cost)
               }}
@@ -1054,6 +1182,7 @@ function InjuryStatMinus({ effect, state, actions, onDone }) {
 function InjuryStatMinus1D({ state, actions, onDone }) {
   const [rolledVal, setRolledVal] = useState(null)   // 확정된 숫자
   const [pending,   setPending]   = useState(false)   // 주사위 굴림 후 onNext 대기
+  const pendingRef                = useRef(null)       // stale closure 방지
   const [picked, setPicked] = useState(null)
 
   if (picked && rolledVal) {
@@ -1088,16 +1217,17 @@ function InjuryStatMinus1D({ state, actions, onDone }) {
         신체 특성치 1D만큼 감소
       </div>
       <DiceRollInline label="부상 — 1D" count={1} sides={6} mod={0} variant="danger"
-        onResult={({ values }) => setPending(values[0])}
-        onNext={() => { setRolledVal(pending); setPending(false) }}
+        onResult={({ values }) => { pendingRef.current = values[0]; setPending(values[0]) }}
+        onNext={() => { setRolledVal(pendingRef.current); setPending(false) }}
       />
     </div>
   )
 }
 // ── 생활 사건 표 ─────────────────────────────────────────────
 function LifeEventEffect({ state, actions, onDone }) {
-  const [rollVal,  setRollVal]  = useState(null)   // 확정된 굴림값
-  const [pending,  setPending]  = useState(null)   // onNext 대기 중 임시값
+  const [rollVal,  setRollVal]  = useState(null)
+  const [pending,  setPending]  = useState(null)
+  const pendingRef              = useRef(null)
   const [subDone,  setSubDone]  = useState(false)
 
   if (rollVal) {
@@ -1147,8 +1277,8 @@ function LifeEventEffect({ state, actions, onDone }) {
         label="생활 사건 굴림"
         count={2} mod={0}
         breakdown={[]}
-        onResult={({ total }) => setPending(total)}
-        onNext={() => { setRollVal(pending); setPending(null) }}
+        onResult={({ total }) => { pendingRef.current = total; setPending(total) }}
+        onNext={() => { setRollVal(pendingRef.current); setPending(null) }}
       />
     </div>
   )
@@ -1156,6 +1286,7 @@ function LifeEventEffect({ state, actions, onDone }) {
 function WeirdEventEffect({ state, actions, onDone }) {
   const [rollVal, setRollVal] = useState(null)
   const [pending, setPending] = useState(null)
+  const pendingRef            = useRef(null)
 
   const subTable = {
     1: '초능력자 단체와 연이 닿습니다. GM과 상의하세요.',
@@ -1190,8 +1321,8 @@ function WeirdEventEffect({ state, actions, onDone }) {
       <DiceRollInline
         label="기이한 사건 — 1D"
         count={1} sides={6} mod={0}
-        onResult={({ values }) => setPending(values[0])}
-        onNext={() => { setRollVal(pending); setPending(null) }}
+        onResult={({ values }) => { pendingRef.current = values[0]; setPending(values[0]) }}
+        onNext={() => { setRollVal(pendingRef.current); setPending(null) }}
       />
     </div>
   )
@@ -1201,6 +1332,7 @@ function WeirdEventEffect({ state, actions, onDone }) {
 function MishapNoEndEffect({ state, actions, onDone }) {
   const [rollVal, setRollVal] = useState(null)
   const [pending, setPending] = useState(null)
+  const pendingRef            = useRef(null)
 
   if (rollVal) {
     return (
@@ -1221,8 +1353,8 @@ function MishapNoEndEffect({ state, actions, onDone }) {
         label="사고 표 — 1D (경력 유지)"
         count={1} sides={6} mod={0}
         variant="danger"
-        onResult={({ values }) => setPending(values[0])}
-        onNext={() => { setRollVal(pending); setPending(null) }}
+        onResult={({ values }) => { pendingRef.current = values[0]; setPending(values[0]) }}
+        onNext={() => { setRollVal(pendingRef.current); setPending(null) }}
       />
     </div>
   )
@@ -1245,7 +1377,10 @@ function OptionalGambleEffect({ effect, state, actions, onDone }) {
       setResult(r)
       if (r.success) {
         const extra = Math.ceil(bet / 2)
-        for (let i = 0; i < extra; i++) actions.dispatch?.({ type: 'EXTRA_MUSTER' })
+        for (let i = 0; i < extra; i++) actions.addExtraMuster?.()
+      } else {
+        // 실패 시 베팅한 소득 굴림 횟수 차감
+        actions.loseMuster?.(bet)
       }
     }
 
@@ -1336,7 +1471,9 @@ function OptionalAdventureEffect({ effect, state, actions, onDone }) {
 // ── 기능 선택 후 판정 ─────────────────────────────────────────
 function SkillChoiceThenCheckEffect({ effect, state, actions, onDone }) {
   const [chosenSkill, setChosenSkill] = useState(null)
-  const [result, setResult]           = useState(null)
+  const [result,  setResult]  = useState(null)
+  const [pending, setPending] = useState(null)
+  const pendingRef            = useRef(null)
 
   if (!chosenSkill) {
     return (
@@ -1353,31 +1490,39 @@ function SkillChoiceThenCheckEffect({ effect, state, actions, onDone }) {
     )
   }
 
-  if (!result) {
+  if (result && !pending) {
+    const afterEffects = result.success ? (effect.success_effect ?? []) : (effect.failure_effect ?? [])
     return (
-      <div className="card" style={{ marginBottom:'0.75rem' }}>
-        <div className="card-title" style={{ fontSize:'0.85rem' }}>판정 — {chosenSkill} {effect.check_target}+</div>
-        <button className="btn btn-primary"
-          onClick={() => setResult(checkSkill(state.skills[chosenSkill] ?? 1, effect.check_target))}
-        >🎲 굴리기</button>
+      <div>
+        <RollResultDisplay result={result} label={`${chosenSkill} ${effect.check_target}+`} />
+        {afterEffects.length > 0
+          ? afterEffects.map((e, i) => (
+              <EffectHandler key={i} effect={e} state={state} actions={actions} isMishap={false}
+                onDone={(log) => { if (i === afterEffects.length - 1) onDone({ tag:'판정', text: result.success?'성공':'실패', kind: result.success?'success':'failure' }) }}
+              />
+            ))
+          : <button className="btn btn-primary" style={{ marginTop:'0.75rem' }}
+              onClick={() => onDone({ tag:'판정', text: result.success?'성공':'실패', kind: result.success?'success':'failure' })}
+            >확인</button>
+        }
       </div>
     )
   }
 
-  const afterEffects = result.success ? (effect.success_effect ?? []) : (effect.failure_effect ?? [])
+  const dm = Math.max(0, state.skills[chosenSkill] ?? 0)
   return (
-    <div>
-      <RollResultDisplay result={result} label={`${chosenSkill} ${effect.check_target}+`} />
-      {afterEffects.length > 0
-        ? afterEffects.map((e, i) => (
-            <EffectHandler key={i} effect={e} state={state} actions={actions} isMishap={false}
-              onDone={(log) => { if (i === afterEffects.length - 1) onDone({ tag:'판정', text: result.success?'성공':'실패', kind: result.success?'success':'failure' }) }}
-            />
-          ))
-        : <button className="btn btn-primary" style={{ marginTop:'0.75rem' }}
-            onClick={() => onDone({ tag:'판정', text: result.success?'성공':'실패', kind: result.success?'success':'failure' })}
-          >확인</button>
-      }
+    <div className="card" style={{ marginBottom:'0.75rem' }}>
+      <div className="card-title" style={{ fontSize:'0.85rem' }}>판정 — {chosenSkill} {effect.check_target}+</div>
+      <DiceRollInline
+        label={`${chosenSkill} ${effect.check_target}+`}
+        count={2} mod={dm} target={effect.check_target}
+        breakdown={dm > 0 ? [{ label:`${chosenSkill} 레벨`, value: dm }] : []}
+        onResult={({ values, total, success }) => {
+          const p = { roll: values[0]+values[1], mod: dm, total, success }
+          pendingRef.current = p; setPending(p)
+        }}
+        onNext={() => { setResult(pendingRef.current); setPending(null) }}
+      />
     </div>
   )
 }

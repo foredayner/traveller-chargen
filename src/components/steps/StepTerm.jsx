@@ -1,5 +1,5 @@
 // StepTerm.jsx — Step 5: 경력 주기 진행
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useCharacterContext } from '../../store/CharacterContext.jsx'
 import { roll1D, statModifier } from '../../utils/dice.js'
 import careersData from '../../data/careersData.js'
@@ -35,6 +35,7 @@ export default function StepTerm() {
   const { state, actions, derived } = useCharacterContext()
   const [sub, setSub]         = useState(SUB.TRAINING)
   const [results, setResults] = useState({})
+  const survivalSuccessRef    = useRef(null)  // stale closure 방지용
   const [careerEvents, setCareerEvents] = useState(null)
 
   const career    = careersData[state.currentCareer]
@@ -61,9 +62,11 @@ export default function StepTerm() {
   }
 
   // ── 직급 보너스 기능 자동 적용 ──────────────────────────────
-  const applyRankBonus = (newRank) => {
+  const applyRankBonus = (newRank, forceOfficer = null) => {
     const rankTable = career?.ranks
-    const rankList = state.currentIsOfficer
+    // forceOfficer가 명시된 경우 그 값을 사용, 아니면 현재 state 참조
+    const isOfficer = forceOfficer !== null ? forceOfficer : state.currentIsOfficer
+    const rankList = isOfficer
       ? (rankTable?.officer ?? [])
       : (rankTable?.[state.currentSpecialty] ?? rankTable?.enlisted ?? rankTable?.all ?? [])
     const entry = rankList.find(r => r.rank === newRank)
@@ -173,14 +176,12 @@ export default function StepTerm() {
           {(() => {
             const gb = state.gradBenefits
             const isMilitaryCareer = ['army','navy','marine'].includes(state.currentCareer)
-            // 졸업 후 첫 군 경력인지:
-            // 현재 경력이 군 경력이고, 이미 장교가 아니고, 임관 혜택 미사용
-            // (같은 경력 2주기 임관 재도전 허용 — 지위 8+ 조건은 별도 체크)
             const isFirstGradMilitary = gb.canCommission && !gb.usedCommission
               && isMilitaryCareer && !state.currentIsOfficer
             const commDm = isFirstGradMilitary ? (gb.commissionDm === 99 ? 0 : gb.commissionDm) : 0
-            const autoComm = isFirstGradMilitary && (gb.autoCommission || gb.commissionDm === 99)
-            // 임관 DM: 첫 주기가 아니면 -1 (지위 8+인 경우)
+            // pendingAutoCommission: 사건으로 얻은 임관 자동 성공 플래그
+            const eventAutoComm = state.pendingAutoCommission && isMilitaryCareer && !state.currentIsOfficer
+            const autoComm = (isFirstGradMilitary && (gb.autoCommission || gb.commissionDm === 99)) || eventAutoComm
             const notFirstDm = !isFirstTerm ? -1 : 0
 
             return (
@@ -207,13 +208,14 @@ export default function StepTerm() {
                     {autoComm ? (
                       <div>
                         <p style={{color:'var(--col-green)',fontSize:'0.82rem',marginBottom:'0.75rem'}}>
-                          사관학교 우등 졸업으로 임관 자동 성공!
+                          {eventAutoComm ? '사건 보너스 — 임관 자동 성공!' : '사관학교 우등 졸업으로 임관 자동 성공!'}
                         </p>
                         <button className="btn btn-primary" onClick={() => {
                           setResults(rv => ({ ...rv, commission: { total:'자동', success:true } }))
                           actions.rollCommission(true)
-                          actions.markGradBenefitUsed('commission')
-                          applyRankBonus(1)
+                          if (isFirstGradMilitary) actions.markGradBenefitUsed('commission')
+                          if (eventAutoComm) actions.setPendingAutoCommission?.(false)  // 플래그 소비
+                          applyRankBonus(1, true)
                           setSub(SUB.SURVIVAL)
                         }}>임관 확인 →</button>
                       </div>
@@ -234,13 +236,16 @@ export default function StepTerm() {
                           // → onNext에서 세팅하도록 임시 보관
                           actions.rollCommission(success)
                           if (isFirstGradMilitary) actions.markGradBenefitUsed('commission')
-                          if (success) applyRankBonus(1)
+                          if (success) applyRankBonus(1, true)  // 임관 = 장교 rank table 사용
                           // 임시 저장 (다음 버튼 클릭 전까지 commission 미세팅)
                           setResults(rv => ({ ...rv, _commissionPending: { roll: values[0]+values[1], mod: statModifier(state.stats.soc??0)+commDm+notFirstDm, total, success } }))
                         }}
                         onNext={() => {
-                          const pending = results._commissionPending
-                          if (pending) setResults(rv => ({ ...rv, commission: pending, _commissionPending: null }))
+                          setResults(rv => {
+                            const pending = rv._commissionPending
+                            if (!pending) return rv
+                            return { ...rv, commission: pending, _commissionPending: null }
+                          })
                           setSub(SUB.SURVIVAL)
                         }}
                       />
@@ -281,12 +286,13 @@ export default function StepTerm() {
               ].filter(b => b.value !== 0)}
               onResult={({ values, total, success }) => {
                 const r = { roll: values[0]+values[1], mod: statModifier(state.stats[specialty?.survival.stat??'end']??0), total, success }
+                survivalSuccessRef.current = success  // stale closure 방지
                 setResults(rv => ({ ...rv, _survivalPending: r, _survivalSuccess: success }))
                 actions.resolveSurvival(success)
               }}
               onNext={() => {
                 setResults(rv => ({ ...rv, survival: rv._survivalPending ?? {}, _survivalPending: null }))
-                setSub(results._survivalSuccess ? SUB.EVENT : SUB.MISHAP)
+                setSub(survivalSuccessRef.current ? SUB.EVENT : SUB.MISHAP)
               }}
             />
           )}
@@ -419,12 +425,22 @@ export default function StepTerm() {
                 eventData={results.event.data}
                 isMishap={false}
                 onResolved={(log) => {
-                  const hasAutoAdvance = log?.some(l => l.tag === '진급')
+                  const hasAutoAdvance     = log?.some(l => l.tag === '진급')
+                  const hasCommissionBonus = log?.some(l => l.tag === '임관보너스')
+                  const hasEndCareer       = log?.some(l => l.tag === '경력' && (l.text?.includes('종료') || l.text?.includes('제대')))
+                  const hasDishonor        = log?.some(l => l.text?.includes('불명예'))
                   if (hasAutoAdvance) {
                     const newRank = Math.min(6, (state.currentRank ?? 0) + 1)
                     actions.resolveAdvancement(true, newRank)
                     applyRankBonus(newRank)
                     setResults(rv => ({ ...rv, advancement: { success: true, total: '자동', roll: 0, mod: 0 }, newRank, eventResolved: true, autoAdvance: true }))
+                  } else if (hasCommissionBonus) {
+                    setResults(rv => ({ ...rv, eventResolved: true, autoAdvance: false, commissionBonus: true }))
+                  } else if (hasEndCareer) {
+                    // 불명예 제대면 소득 전체 차감
+                    if (hasDishonor) actions.loseMuster?.(state.cashRolls ?? 1)
+                    actions.resolveSurvival(false)  // 경력 종료
+                    setResults(rv => ({ ...rv, eventResolved: true, autoAdvance: false, forcedEnd: true }))
                   } else {
                     setResults(rv => ({ ...rv, eventResolved: true, autoAdvance: false }))
                   }
@@ -478,6 +494,16 @@ export default function StepTerm() {
                           다음 — {needAging ? '노화 굴림' : '주기 종료'} →
                         </button>
                       )}
+                    </div>
+                  ) : results.commissionBonus ? (
+                    <div>
+                      <div style={{padding:'0.6rem 0.9rem',marginBottom:'0.75rem',background:'rgba(78,205,196,0.07)',border:'1px solid rgba(78,205,196,0.3)',borderRadius:'var(--radius-md)'}}>
+                        <div style={{fontFamily:'var(--font-mono)',fontSize:'0.72rem',color:'var(--col-cyan)',marginBottom:'3px'}}>★ 영웅적 활약 — 임관 보너스</div>
+                        <div style={{fontSize:'0.85rem',color:'var(--col-text)'}}>다음 임관 굴림이 자동으로 성공합니다.</div>
+                      </div>
+                      <button className="btn btn-primary" onClick={() => setSub(SUB.ADVANCEMENT)}>
+                        다음 — 진급 굴림 →
+                      </button>
                     </div>
                   ) : (
                     <button className="btn btn-primary" onClick={() => setSub(SUB.ADVANCEMENT)}>

@@ -1,6 +1,6 @@
 // StepPreCareer.jsx — Step 3: 경력 전 교육
 // 룰북 p.14: 3주기까지 입학 가능, 입학 후 기능 선택 + 사건 굴림 + 졸업 굴림
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useCharacterContext } from '../../store/CharacterContext.jsx'
 import { DiceRollInline } from '../DiceAnimator.jsx'
 import { loadEventsData } from '../../data/eventsData.js'
@@ -58,6 +58,7 @@ export default function StepPreCareer() {
   const [selected,     setSelected]     = useState(null)
   const [entryResult,  setEntryResult]  = useState(null)
   const [entryPending, setEntryPending] = useState(null)  // onNext 대기용
+  const entryPendingRef = useRef(null)  // stale closure 방지용
   const [skillPicked0, setSkillPicked0] = useState('')   // 대학교 기능 레벨 0
   const [skillPicked1, setSkillPicked1] = useState('')   // 대학교 기능 레벨 1
   const [eventData,    setEventData]    = useState(null) // 사건 표 결과
@@ -65,6 +66,7 @@ export default function StepPreCareer() {
   const [eventResolved,setEventResolved]= useState(false)
   const [gradResult,   setGradResult]   = useState(null)
   const [gradPending,  setGradPending]  = useState(null)  // onNext 대기용
+  const gradPendingRef = useRef(null)  // stale closure 방지용
   const [careerEvents, setCareerEvents] = useState(null)
   const [phase, setPhase]              = useState('entry') // entry|skills|event|grad|done
 
@@ -193,12 +195,13 @@ export default function StepPreCareer() {
                   ].filter(b => b.value !== 0)}
                   onResult={({ values, total, success }) => {
                     const mod = sm(state.stats[option.check.stat]) - termCount
-                    // entryPending에만 저장 → entryResult 건드리지 않음 → DiceRollInline 유지
-                    setEntryPending({ roll: values[0]+values[1], mod, total, success })
+                    const p = { roll: values[0]+values[1], mod, total, success }
+                    entryPendingRef.current = p  // ref에 즉시 저장 (stale closure 방지)
+                    setEntryPending(p)
                   }}
                   onNext={() => {
-                    // 다음 버튼 클릭 → entryPending을 entryResult로 확정
-                    if (entryPending) setEntryResult(entryPending)
+                    const p = entryPendingRef.current
+                    if (p) setEntryResult(p)
                   }}
                 />
               ) : (
@@ -326,12 +329,13 @@ export default function StepPreCareer() {
                   ].filter(b => b.value !== 0)}
                   onResult={({ values, total, success }) => {
                     const mod = sm(state.stats[option.gradCheck.stat])
-                    // gradPending에만 저장 → gradResult 건드리지 않음 → DiceRollInline 유지
-                    setGradPending({ roll: values[0]+values[1], mod, total, success })
+                    const p = { roll: values[0]+values[1], mod, total, success }
+                    gradPendingRef.current = p  // ref에 즉시 저장 (stale closure 방지)
+                    setGradPending(p)
                   }}
                   onNext={() => {
-                    // 다음 버튼 클릭 → gradPending을 gradResult로 확정
-                    if (gradPending) setGradResult(gradPending)
+                    const p = gradPendingRef.current
+                    if (p) setGradResult(p)
                   }}
                 />
               ) : gradResult ? (

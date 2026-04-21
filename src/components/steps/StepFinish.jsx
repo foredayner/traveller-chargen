@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 //  StepFinish.jsx — Step 6: 퇴직 소득 + 완전한 캐릭터 시트
 // ─────────────────────────────────────────────────────────────
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useCharacterContext } from '../../store/CharacterContext.jsx'
 import careersData from '../../data/careersData.js'
 import { DiceRollInline } from '../DiceAnimator.jsx'
@@ -57,8 +57,9 @@ function CharacterSheetPanel({ state, actions, derived }) {
 
   const specInfo = SPECIES_LIST.find(s => s.id === speciesId) ?? SPECIES_LIST[0]
   const uppStr   = STAT_KEYS.map(k => {
-    const v = stats[k] ?? 0
-    return v >= 10 ? String.fromCharCode(55 + v) : String(v)
+    const v = (stats[k] ?? 0) + (statAdj[k] ?? 0)  // statAdjustments 반영
+    const clamped = Math.max(0, Math.min(15, v))
+    return clamped >= 10 ? String.fromCharCode(55 + clamped) : String(clamped)
   }).join('')
 
   const addWeapon = () => setWeapons(w => [...w, {name:'',tl:'',range:'',dmg:'',attr:''}])
@@ -679,6 +680,7 @@ function MusterOutPanel({ state, actions, derived, totalRolls, remaining, onNext
   const [rollType,    setRollType]    = useState(null)
   const [rollValue,   setRollValue]   = useState(null)
   const [rollPending, setRollPending] = useState(null)  // onNext 대기
+  const rollPendingRef = useRef(null)  // stale closure 방지
   const usedRolls  = (state.benefits?.length??0)+(state.cashRollsUsed??0)
   const lastCareer = state.careers.at(-1)
   const careerDef  = careersData[lastCareer?.careerId]
@@ -686,15 +688,17 @@ function MusterOutPanel({ state, actions, derived, totalRolls, remaining, onNext
   const hasGamble  = (state.skills?.['도박']??-1)>=1
   const maxRank    = state.careers.reduce((m,c)=>Math.max(m,c.rank??0),0)
   const rankDm     = maxRank>=5?1:0
+  const eventDm    = state._musterDm ?? 0   // 사건으로 받은 소득 굴림 DM
+  const totalDm    = rankDm + eventDm
   const allDone    = remaining<=0
 
   const applyRoll = () => {
     if (!rollType||!rollValue) return
     if (rollType==='cash') {
-      const cashIdx = Math.min(6, rollValue+(hasGamble?1:0)+rankDm-1)
+      const cashIdx = Math.min(6, rollValue+(hasGamble?1:0)+totalDm-1)
       actions.resolveMuster('cash', mustering.cash[cashIdx]??0)
     } else {
-      const benefit = mustering.benefits[Math.min(6,rollValue+rankDm-1)]??'—'
+      const benefit = mustering.benefits[Math.min(6,rollValue+totalDm-1)]??'—'
       const m = benefit.match(/(str|dex|end|int|edu|soc)\+(\d+)/i)
       if (m) actions.applyStatChange(m[1].toLowerCase(), parseInt(m[2]))
       actions.resolveMuster('benefit', benefit)
@@ -734,14 +738,14 @@ function MusterOutPanel({ state, actions, derived, totalRolls, remaining, onNext
           {!rollType && (
             <div>
               <p className="text-muted" style={{fontSize:'0.82rem',marginBottom:'0.75rem'}}>
-                현금 열 또는 소득 열을 선택합니다.{hasGamble&&<span style={{color:'var(--col-gold)'}}> 도박 기능 보유: 현금 +1.</span>}{rankDm>0&&<span style={{color:'var(--col-cyan)'}}> 직급 5+: 전 굴림 +1.</span>}
+                현금 열 또는 소득 열을 선택합니다.{hasGamble&&<span style={{color:'var(--col-gold)'}}> 도박 기능: 현금 +1.</span>}{rankDm>0&&<span style={{color:'var(--col-cyan)'}}> 직급 5+: +1.</span>}{eventDm>0&&<span style={{color:'var(--col-green)'}}> 사건 보너스: +{eventDm}.</span>}
               </p>
               <div style={{display:'grid',gridTemplateColumns:'auto 1fr 1fr',gap:'0.2rem 0.8rem',fontSize:'0.72rem',fontFamily:'var(--font-mono)',marginBottom:'0.75rem'}}>
                 <span style={{color:'var(--col-text-dim)'}}>1D</span><span style={{color:'var(--col-text-muted)'}}>현금</span><span style={{color:'var(--col-text-muted)'}}>소득</span>
                 {Array.from({length:7},(_,i)=>[
                   <span key={`n${i}`} style={{color:'var(--col-text-dim)'}}>{i+1}</span>,
-                  <span key={`c${i}`} style={{color:'var(--col-text)'}}>Cr {(mustering.cash[Math.min(6,i+(hasGamble?1:0)+rankDm)]??0).toLocaleString()}</span>,
-                  <span key={`b${i}`} style={{color:'var(--col-cyan)'}}>{mustering.benefits[Math.min(6,i+rankDm)]??'—'}</span>,
+                  <span key={`c${i}`} style={{color:'var(--col-text)'}}>Cr {(mustering.cash[Math.min(6,i+(hasGamble?1:0)+totalDm)]??0).toLocaleString()}</span>,
+                  <span key={`b${i}`} style={{color:'var(--col-cyan)'}}>{mustering.benefits[Math.min(6,i+totalDm)]??'—'}</span>,
                 ])}
               </div>
               <div className="choice-group">
@@ -756,8 +760,8 @@ function MusterOutPanel({ state, actions, derived, totalRolls, remaining, onNext
               <DiceRollInline
                 label="소득 굴림 — 1D"
                 count={1} sides={6} mod={0}
-                onResult={({values}) => setRollPending(values[0])}
-                onNext={() => { setRollValue(rollPending); setRollPending(null) }}
+                onResult={({values}) => { rollPendingRef.current = values[0]; setRollPending(values[0]) }}
+                onNext={() => { setRollValue(rollPendingRef.current); setRollPending(null) }}
               />
               <button className="btn btn-ghost" style={{marginTop:'0.5rem',fontSize:'0.75rem'}} onClick={()=>setRollType(null)}>← 뒤로</button>
             </div>
@@ -767,7 +771,7 @@ function MusterOutPanel({ state, actions, derived, totalRolls, remaining, onNext
               <div style={{padding:'0.75rem 1rem',border:`1.5px solid ${rollType==='cash'?'var(--col-gold)':'var(--col-cyan)'}`,borderRadius:'var(--radius-md)',background:rollType==='cash'?'rgba(200,168,75,0.07)':'rgba(79,195,212,0.07)',marginBottom:'0.75rem'}}>
                 <div style={{fontFamily:'var(--font-mono)',fontSize:'0.65rem',color:'var(--col-text-muted)',marginBottom:'4px'}}>1D: {rollValue} — {rollType==='cash'?'현금 획득':'소득 획득'}</div>
                 <div style={{fontSize:'1.1rem',fontWeight:500,color:rollType==='cash'?'var(--col-gold)':'var(--col-cyan)'}}>
-                  {rollType==='cash'?`Cr ${(mustering.cash[Math.min(6,rollValue+(hasGamble?1:0)+rankDm-1)]??0).toLocaleString()}`:mustering.benefits[Math.min(6,rollValue+rankDm-1)]??'—'}
+                  {rollType==='cash'?`Cr ${(mustering.cash[Math.min(6,rollValue+(hasGamble?1:0)+totalDm-1)]??0).toLocaleString()}`:mustering.benefits[Math.min(6,rollValue+totalDm-1)]??'—'}
                 </div>
               </div>
               <div className="choice-group">

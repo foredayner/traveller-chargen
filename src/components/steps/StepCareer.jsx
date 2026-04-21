@@ -1,5 +1,5 @@
 // StepCareer.jsx — Step 4: 경력 선택 + 자격 굴림
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useCharacterContext } from '../../store/CharacterContext.jsx'
 import { statModifier } from '../../utils/dice.js'
 import careersData from '../../data/careersData.js'
@@ -22,6 +22,7 @@ export default function StepCareer() {
   const { state, actions } = useCharacterContext()
   const [qualResult,  setQualResult]  = useState(null)
   const [qualPending, setQualPending] = useState(null)  // onNext 대기용
+  const qualPendingRef = useRef(null)  // stale closure 방지용
   const [showDraft, setShowDraft] = useState(false)
   const [draftResult, setDraftResult] = useState(null)
 
@@ -77,6 +78,8 @@ export default function StepCareer() {
                   if (!prev) return prev
                   const { _pending, defaultSpecialty, ...rest } = prev
                   actions.acceptDraft(rest.careerId, defaultSpecialty)
+                  // 사건으로 받은 징병 플래그 소비
+                  if (state.pendingNextDraft) actions.setPendingNextDraft?.(false)
                   return rest
                 })
               }}
@@ -129,6 +132,20 @@ export default function StepCareer() {
               : '첫 번째 경력을 선택합니다. 자격 굴림에 성공해야 입대할 수 있습니다.'}
         </p>
       </div>
+
+      {/* 사건으로 강제된 다음 경력 안내 */}
+      {state.pendingPrisoner && (
+        <div style={{padding:'0.75rem 1rem',marginBottom:'1rem',background:'rgba(224,82,82,0.07)',border:'1px solid rgba(224,82,82,0.35)',borderLeft:'3px solid var(--col-red)',borderRadius:'var(--radius-md)'}}>
+          <div style={{fontFamily:'var(--font-mono)',fontSize:'0.68rem',color:'var(--col-red)',marginBottom:'3px'}}>⚠ 사건 결과</div>
+          <div style={{fontSize:'0.85rem',color:'var(--col-text)'}}>이번 주기는 <strong style={{color:'var(--col-red)'}}>죄수 경력</strong>으로 강제됩니다. (미구현 — GM과 상의하세요)</div>
+        </div>
+      )}
+      {state.pendingNextDraft && (
+        <div style={{padding:'0.75rem 1rem',marginBottom:'1rem',background:'rgba(224,160,0,0.07)',border:'1px solid rgba(224,160,0,0.35)',borderLeft:'3px solid var(--col-amber)',borderRadius:'var(--radius-md)'}}>
+          <div style={{fontFamily:'var(--font-mono)',fontSize:'0.68rem',color:'var(--col-amber)',marginBottom:'3px'}}>⚠ 사건 결과</div>
+          <div style={{fontSize:'0.85rem',color:'var(--col-text)'}}>이번 주기는 <strong style={{color:'var(--col-amber)'}}>징병</strong>이 강제됩니다. 아래 징병 굴림 버튼을 사용하세요.</div>
+        </div>
+      )}
 
       {/* 경력 그리드 */}
       <div className="career-grid">
@@ -366,12 +383,14 @@ export default function StepCareer() {
                     ...(eventDm > 0 ? [{ label:'사건 DM', value: eventDm }] : []),
                   ].filter(b => b.value !== 0)}
                   onResult={({ values, total, success }) => {
+                    qualPendingRef.current = { total, success }  // stale closure 방지
                     setQualPending({ total, success })
                   }}
                   onNext={() => {
-                    if (!qualPending) return
-                    setQualResult(qualPending)
-                    actions.resolveQualRoll(qualPending.success)
+                    const p = qualPendingRef.current
+                    if (!p) return
+                    setQualResult(p)
+                    actions.resolveQualRoll(p.success)
                     if (gradDm > 0) actions.markGradBenefitUsed('qualDm')
                     if (eventDm > 0) actions.clearNextQualDm()
                   }}

@@ -148,6 +148,34 @@ export function useCharacter() {
     dispatch({ type: A.APPLY_MEDICAL_DEBT, amount })
   }, [])
 
+  const addExtraMuster = useCallback(() => {
+    dispatch({ type: A.EXTRA_MUSTER })
+  }, [])
+
+  const loseMuster = useCallback((count = 1) => {
+    dispatch({ type: A.LOSE_MUSTER, count })
+  }, [])
+
+  const setAdvancementDm = useCallback((value) => {
+    dispatch({ type: A.SET_ADVANCEMENT_DM, value })
+  }, [])
+
+  const setPendingAutoCommission = useCallback((value) => {
+    dispatch({ type: A.SET_PENDING_AUTO_COMMISSION, value })
+  }, [])
+
+  const setNextQualDm = useCallback((value = 1) => {
+    dispatch({ type: A.SET_NEXT_QUAL_DM, value })
+  }, [])
+
+  const setPendingNextDraft = useCallback((value) => {
+    dispatch({ type: A.SET_PENDING_NEXT_DRAFT, value })
+  }, [])
+
+  const setPendingPrisoner = useCallback((value) => {
+    dispatch({ type: A.SET_PENDING_PRISONER, value })
+  }, [])
+
   const setStatAdjustment = useCallback((stat, value) => {
     dispatch({ type: A.SET_STAT_ADJUSTMENT, stat, value })
   }, [])
@@ -158,6 +186,11 @@ export function useCharacter() {
 
   const setPsionic = useCallback((psionic) => {
     dispatch({ type: A.SET_PSIONIC, psionic })
+  }, [])
+
+  // SET_EVENT_COMMISSION_BONUS는 deprecated — setPendingAutoCommission으로 대체됨
+  const setEventCommissionBonus = useCallback(() => {
+    dispatch({ type: A.SET_PENDING_AUTO_COMMISSION, value: true })
   }, [])
 
   const markGradBenefitUsed = useCallback((field) => {
@@ -321,9 +354,17 @@ export function useCharacter() {
       markGradBenefitUsed,
       clearNextQualDm,
       applyMedicalDebt,
+      addExtraMuster,
+      loseMuster,
+      setAdvancementDm,
+      setPendingAutoCommission,
+      setNextQualDm,
+      setPendingNextDraft,
+      setPendingPrisoner,
       setStatAdjustment,
       setPortrait,
       setPsionic,
+      setEventCommissionBonus,
       resolveSurvival,
       resolveEvent,
       resolveMishap,
