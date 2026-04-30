@@ -63,6 +63,7 @@ export default function StepPreCareer() {
   const [skillPicked1, setSkillPicked1] = useState('')   // 대학교 기능 레벨 1
   const [eventData,    setEventData]    = useState(null) // 사건 표 결과
   const [eventPending, setEventPending] = useState(null) // onNext 대기용
+  const eventPendingRef = useRef(null)  // stale closure 방지
   const [eventResolved,setEventResolved]= useState(false)
   const [gradResult,   setGradResult]   = useState(null)
   const [gradPending,  setGradPending]  = useState(null)  // onNext 대기용
@@ -275,9 +276,14 @@ export default function StepPreCareer() {
                   onResult={({ values, total }) => {
                     const evTable = careerEvents?.[selected]?.events ?? {}
                     const ev = evTable[String(total)] ?? { text:'특별한 일이 있었습니다.', effects:[] }
-                    setEventPending({ d1: values[0], d2: values[1], total, data: ev })
+                    const p = { d1: values[0], d2: values[1], total, data: ev }
+                    eventPendingRef.current = p
+                    setEventPending(p)
                   }}
-                  onNext={() => { if (eventPending) setEventData(eventPending) }}
+                  onNext={() => {
+                    const p = eventPendingRef.current
+                    if (p) setEventData(p)
+                  }}
                 />
               ) : eventData ? (
                 <>
@@ -296,7 +302,7 @@ export default function StepPreCareer() {
                   {!eventResolved ? (
                     <EventResolver
                       key={`precareer-event-${eventData.total}`}
-                      eventData={eventData.data}
+                      eventData={eventData.data ?? { text: eventData.text ?? '', effects: [] }}
                       isMishap={false}
                       onResolved={() => { setEventResolved(true) }}
                     />

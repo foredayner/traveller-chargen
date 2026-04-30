@@ -50,8 +50,13 @@ export default function EventResolver({ eventData, isMishap = false, onResolved 
   const { state, actions } = useCharacterContext()
   const [queue, setQueue]       = useState(() => [...(eventData?.effects ?? [])])
   const [resolved, setResolved] = useState([])
-  const [done, setDone]         = useState(false)
-  const resolvedRef             = useRef([])  // 항상 최신 resolved 유지
+  const [isDone, setIsDone]     = useState(false)
+  const resolvedRef             = useRef([])
+  const calledRef               = useRef(false)
+  const onResolvedRef           = useRef(onResolved)  // 항상 최신 콜백 유지
+
+  // onResolved prop이 바뀌면 ref 업데이트
+  useEffect(() => { onResolvedRef.current = onResolved }, [onResolved])
 
   const current = queue[0] ?? null
 
@@ -60,36 +65,24 @@ export default function EventResolver({ eventData, isMishap = false, onResolved 
     if (logEntry) {
       setResolved(r => {
         const next = [...r, logEntry]
-        resolvedRef.current = next  // ref도 동기 업데이트
+        resolvedRef.current = next
         return next
       })
     }
   }, [])
 
-  // 빈 큐 감지 — useEffect로 렌더 중 state 업데이트 방지
+  // 큐가 비면 완료 — onResolved 1회 호출
   useEffect(() => {
-    if (!done && queue.length === 0) {
-      setDone(true)
+    if (queue.length === 0 && !calledRef.current) {
+      calledRef.current = true
+      setIsDone(true)
+      onResolvedRef.current?.(resolvedRef.current)
     }
-  }, [done, queue.length])
+  }, [queue.length])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // done이 true가 된 후 onResolved 호출 (ref로 최신 resolved 보장)
-  useEffect(() => {
-    if (done) {
-      onResolved?.(resolvedRef.current)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [done])
-
-  // ─── 렌더: 완료 상태 ────────────────────────────────────────
-  if (done) {
-    return (
-      <ResolvedSummary
-        eventData={eventData}
-        isMishap={isMishap}
-        log={resolved}
-      />
-    )
+  // 완료 상태: 요약 표시 (부모가 언마운트할 때까지 유지)
+  if (isDone) {
+    return <ResolvedSummary eventData={eventData} isMishap={isMishap} log={resolvedRef.current} />
   }
 
   // ─── 렌더: 현재 effect 처리 UI ──────────────────────────────
