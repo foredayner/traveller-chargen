@@ -48,43 +48,51 @@ const CONTACT_LABELS = { ally:'조력자', contact:'연줄', rival:'경쟁자', 
 // ─────────────────────────────────────────────────────────────
 export default function EventResolver({ eventData, isMishap = false, onResolved }) {
   const { state, actions } = useCharacterContext()
-  const [queue, setQueue]   = useState(() => [...(eventData?.effects ?? [])])
-  const [resolved, setResolved] = useState([])
-  const resolvedRef  = useRef([])
-  const calledRef    = useRef(false)
-  const onResolvedRef = useRef(onResolved)
 
-  // onResolved를 항상 최신으로 유지
-  useEffect(() => { onResolvedRef.current = onResolved }, [onResolved])
+  const effects = eventData?.effects ?? []
+
+  const [queue,    setQueue]    = useState(() => [...effects])
+  const [resolved, setResolved] = useState([])
+  const [done,     setDone]     = useState(() => effects.length === 0)
+
+  const resolvedRef   = useRef([])
+  const onResolvedRef = useRef(onResolved)
+  // 렌더마다 최신 콜백으로 동기 업데이트 (useEffect 없이)
+  onResolvedRef.current = onResolved
+
+  const firedRef = useRef(false)
 
   const current = queue[0] ?? null
 
   const advance = useCallback((logEntry = null, extraQueue = []) => {
-    setQueue(q => [...extraQueue, ...q.slice(1)])
     if (logEntry) {
-      setResolved(r => {
-        const next = [...r, logEntry]
-        resolvedRef.current = next
-        return next
-      })
+      const next = [...resolvedRef.current, logEntry]
+      resolvedRef.current = next
+      setResolved(next)
     }
+    setQueue(prev => {
+      const next = [...extraQueue, ...prev.slice(1)]
+      return next
+    })
   }, [])
 
-  // 큐가 빈 상태: 즉시 완료 처리
-  // useLayoutEffect — DOM 업데이트 직후 동기적으로 실행 (useEffect보다 이름)
-  // calledRef로 중복 방지
+  // queue가 0이 되면 done 세팅
   useEffect(() => {
-    if (queue.length === 0 && !calledRef.current) {
-      calledRef.current = true
-      // 다음 마이크로태스크에서 호출 — 현재 렌더 사이클 완료 후 부모 업데이트
-      Promise.resolve().then(() => {
-        onResolvedRef.current?.(resolvedRef.current)
-      })
+    if (queue.length === 0 && !done) {
+      setDone(true)
     }
-  })  // 의존성 없이 매 렌더마다 체크 — calledRef가 1회 실행 보장
+  }, [queue.length, done])
 
-  // 큐가 비었으면 완료 화면
-  if (queue.length === 0) {
+  // done이 true가 된 후 onResolved 호출 (1회만)
+  useEffect(() => {
+    if (done && !firedRef.current) {
+      firedRef.current = true
+      onResolvedRef.current?.(resolvedRef.current)
+    }
+  }, [done])
+
+  // 완료 화면 — onResolved가 부모를 업데이트해 언마운트할 때까지 표시
+  if (done) {
     return <ResolvedSummary eventData={eventData} isMishap={isMishap} log={resolvedRef.current} />
   }
 
