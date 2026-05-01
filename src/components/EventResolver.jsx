@@ -53,9 +53,8 @@ export default function EventResolver({ eventData, isMishap = false, onResolved 
   const [isDone, setIsDone]     = useState(false)
   const resolvedRef             = useRef([])
   const calledRef               = useRef(false)
-  const onResolvedRef           = useRef(onResolved)  // 항상 최신 콜백 유지
+  const onResolvedRef           = useRef(onResolved)
 
-  // onResolved prop이 바뀌면 ref 업데이트
   useEffect(() => { onResolvedRef.current = onResolved }, [onResolved])
 
   const current = queue[0] ?? null
@@ -71,17 +70,23 @@ export default function EventResolver({ eventData, isMishap = false, onResolved 
     }
   }, [])
 
-  // 큐가 비면 완료 — onResolved 1회 호출
+  // 큐가 비면 완료 처리 (초기 빈 큐 + advance 후 빈 큐 모두 처리)
   useEffect(() => {
     if (queue.length === 0 && !calledRef.current) {
       calledRef.current = true
       setIsDone(true)
-      onResolvedRef.current?.(resolvedRef.current)
     }
   }, [queue.length])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 완료 상태: 요약 표시 (부모가 언마운트할 때까지 유지)
-  if (isDone) {
+  // isDone이 true로 세팅된 다음 렌더에서 onResolved 호출 (렌더 충돌 방지)
+  useEffect(() => {
+    if (isDone) {
+      onResolvedRef.current?.(resolvedRef.current)
+    }
+  }, [isDone])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 완료 상태 렌더 — isDone이 세팅되기 전 queue===0 순간도 커버
+  if (isDone || queue.length === 0) {
     return <ResolvedSummary eventData={eventData} isMishap={isMishap} log={resolvedRef.current} />
   }
 
