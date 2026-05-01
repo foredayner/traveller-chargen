@@ -14,7 +14,7 @@
 //    />
 // ─────────────────────────────────────────────────────────────
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useCharacterContext } from '../store/CharacterContext.jsx'
 import { checkStat, checkSkill, roll1D, roll2D, rollInjuryTable } from '../utils/dice.js'
 import { lifeEvents, injuryTable, getAgingResult } from '../data/eventsData.js'
