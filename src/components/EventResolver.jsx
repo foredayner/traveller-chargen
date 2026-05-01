@@ -48,13 +48,13 @@ const CONTACT_LABELS = { ally:'조력자', contact:'연줄', rival:'경쟁자', 
 // ─────────────────────────────────────────────────────────────
 export default function EventResolver({ eventData, isMishap = false, onResolved }) {
   const { state, actions } = useCharacterContext()
-  const [queue, setQueue]       = useState(() => [...(eventData?.effects ?? [])])
+  const [queue, setQueue]   = useState(() => [...(eventData?.effects ?? [])])
   const [resolved, setResolved] = useState([])
-  const [isDone, setIsDone]     = useState(false)
-  const resolvedRef             = useRef([])
-  const calledRef               = useRef(false)
-  const onResolvedRef           = useRef(onResolved)
+  const resolvedRef  = useRef([])
+  const calledRef    = useRef(false)
+  const onResolvedRef = useRef(onResolved)
 
+  // onResolved를 항상 최신으로 유지
   useEffect(() => { onResolvedRef.current = onResolved }, [onResolved])
 
   const current = queue[0] ?? null
@@ -70,23 +70,21 @@ export default function EventResolver({ eventData, isMishap = false, onResolved 
     }
   }, [])
 
-  // 큐가 비면 완료 처리 (초기 빈 큐 + advance 후 빈 큐 모두 처리)
+  // 큐가 빈 상태: 즉시 완료 처리
+  // useLayoutEffect — DOM 업데이트 직후 동기적으로 실행 (useEffect보다 이름)
+  // calledRef로 중복 방지
   useEffect(() => {
     if (queue.length === 0 && !calledRef.current) {
       calledRef.current = true
-      setIsDone(true)
+      // 다음 마이크로태스크에서 호출 — 현재 렌더 사이클 완료 후 부모 업데이트
+      Promise.resolve().then(() => {
+        onResolvedRef.current?.(resolvedRef.current)
+      })
     }
-  }, [queue.length])  // eslint-disable-line react-hooks/exhaustive-deps
+  })  // 의존성 없이 매 렌더마다 체크 — calledRef가 1회 실행 보장
 
-  // isDone이 true로 세팅된 다음 렌더에서 onResolved 호출 (렌더 충돌 방지)
-  useEffect(() => {
-    if (isDone) {
-      onResolvedRef.current?.(resolvedRef.current)
-    }
-  }, [isDone])  // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 완료 상태 렌더 — isDone이 세팅되기 전 queue===0 순간도 커버
-  if (isDone || queue.length === 0) {
+  // 큐가 비었으면 완료 화면
+  if (queue.length === 0) {
     return <ResolvedSummary eventData={eventData} isMishap={isMishap} log={resolvedRef.current} />
   }
 
